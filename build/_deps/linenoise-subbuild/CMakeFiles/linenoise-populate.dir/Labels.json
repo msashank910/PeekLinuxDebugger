@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/home/msashank910/Projects/LinuxDebugger/build/_deps/linenoise-subbuild/CMakeFiles/linenoise-populate"
+		},
+		{
+			"file" : "/home/msashank910/Projects/LinuxDebugger/build/_deps/linenoise-subbuild/CMakeFiles/linenoise-populate.rule"
+		},
+		{
+			"file" : "/home/msashank910/Projects/LinuxDebugger/build/_deps/linenoise-subbuild/CMakeFiles/linenoise-populate-complete.rule"
+		},
+		{
+			"file" : "/home/msashank910/Projects/LinuxDebugger/build/_deps/linenoise-subbuild/linenoise-populate-prefix/src/linenoise-populate-stamp/linenoise-populate-build.rule"
+		},
+		{
+			"file" : "/home/msashank910/Projects/LinuxDebugger/build/_deps/linenoise-subbuild/linenoise-populate-prefix/src/linenoise-populate-stamp/linenoise-populate-configure.rule"
+		},
+		{
+			"file" : "/home/msashank910/Projects/LinuxDebugger/build/_deps/linenoise-subbuild/linenoise-populate-prefix/src/linenoise-populate-stamp/linenoise-populate-download.rule"
+		},
+		{
+			"file" : "/home/msashank910/Projects/LinuxDebugger/build/_deps/linenoise-subbuild/linenoise-populate-prefix/src/linenoise-populate-stamp/linenoise-populate-install.rule"
+		},
+		{
+			"file" : "/home/msashank910/Projects/LinuxDebugger/build/_deps/linenoise-subbuild/linenoise-populate-prefix/src/linenoise-populate-stamp/linenoise-populate-mkdir.rule"
+		},
+		{
+			"file" : "/home/msashank910/Projects/LinuxDebugger/build/_deps/linenoise-subbuild/linenoise-populate-prefix/src/linenoise-populate-stamp/linenoise-populate-patch.rule"
+		},
+		{
+			"file" : "/home/msashank910/Projects/LinuxDebugger/build/_deps/linenoise-subbuild/linenoise-populate-prefix/src/linenoise-populate-stamp/linenoise-populate-test.rule"
+		},
+		{
+			"file" : "/home/msashank910/Projects/LinuxDebugger/build/_deps/linenoise-subbuild/linenoise-populate-prefix/src/linenoise-populate-stamp/linenoise-populate-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"linenoise-populate"
+		],
+		"name" : "linenoise-populate"
+	}
+}

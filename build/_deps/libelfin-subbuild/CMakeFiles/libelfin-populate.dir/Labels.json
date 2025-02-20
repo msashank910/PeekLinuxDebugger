@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/home/msashank910/Projects/LinuxDebugger/build/_deps/libelfin-subbuild/CMakeFiles/libelfin-populate"
+		},
+		{
+			"file" : "/home/msashank910/Projects/LinuxDebugger/build/_deps/libelfin-subbuild/CMakeFiles/libelfin-populate.rule"
+		},
+		{
+			"file" : "/home/msashank910/Projects/LinuxDebugger/build/_deps/libelfin-subbuild/CMakeFiles/libelfin-populate-complete.rule"
+		},
+		{
+			"file" : "/home/msashank910/Projects/LinuxDebugger/build/_deps/libelfin-subbuild/libelfin-populate-prefix/src/libelfin-populate-stamp/libelfin-populate-build.rule"
+		},
+		{
+			"file" : "/home/msashank910/Projects/LinuxDebugger/build/_deps/libelfin-subbuild/libelfin-populate-prefix/src/libelfin-populate-stamp/libelfin-populate-configure.rule"
+		},
+		{
+			"file" : "/home/msashank910/Projects/LinuxDebugger/build/_deps/libelfin-subbuild/libelfin-populate-prefix/src/libelfin-populate-stamp/libelfin-populate-download.rule"
+		},
+		{
+			"file" : "/home/msashank910/Projects/LinuxDebugger/build/_deps/libelfin-subbuild/libelfin-populate-prefix/src/libelfin-populate-stamp/libelfin-populate-install.rule"
+		},
+		{
+			"file" : "/home/msashank910/Projects/LinuxDebugger/build/_deps/libelfin-subbuild/libelfin-populate-prefix/src/libelfin-populate-stamp/libelfin-populate-mkdir.rule"
+		},
+		{
+			"file" : "/home/msashank910/Projects/LinuxDebugger/build/_deps/libelfin-subbuild/libelfin-populate-prefix/src/libelfin-populate-stamp/libelfin-populate-patch.rule"
+		},
+		{
+			"file" : "/home/msashank910/Projects/LinuxDebugger/build/_deps/libelfin-subbuild/libelfin-populate-prefix/src/libelfin-populate-stamp/libelfin-populate-test.rule"
+		},
+		{
+			"file" : "/home/msashank910/Projects/LinuxDebugger/build/_deps/libelfin-subbuild/libelfin-populate-prefix/src/libelfin-populate-stamp/libelfin-populate-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"libelfin-populate"
+		],
+		"name" : "libelfin-populate"
+	}
+}
