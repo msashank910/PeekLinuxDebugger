@@ -16,7 +16,14 @@
 //create bash script for this later
 
 
-//Helpers
+//Helpers 
+std::string strip0x(const std::string& s) {          //maybe change later
+    if(!s.empty() && s.length() > 2 && s[0] == '0' && s[1] == 'x') {
+        return std::string(s.begin() + 2, s.end());
+    }
+    return s;
+}
+
 bool isPrefix(const std::string& a, const std::string& b) {
     return std::equal(a.begin(), a.end(), b.begin());
 }
@@ -37,14 +44,14 @@ std::vector<std::string> splitLine(const std::string &line, char delimiter) {
 
 //Classes
 class Debugger {
-    pid_t _pid;
-    std::string _progName;
-    std::unordered_map<std::intptr_t, Breakpoint> _addrToBp;
+    pid_t pid_;
+    std::string progName_;
+    std::unordered_map<std::intptr_t, Breakpoint> addrToBp_;
 
     void handleCommand(std::string args);
 
 public:
-    Debugger(int _pid, std::string _progName);
+    Debugger(int pid, std::string progName);
     void run();
     
     void setBreakpointAtAddress(std::intptr_t address);
@@ -52,11 +59,12 @@ public:
 };
 
 class Breakpoint {
-    bool _enabled;
-    std::intptr_t _addr;
-    std::uint8_t _data;
-    pid_t _pid;
+    bool enabled_;
+    std::intptr_t addr_;
+    std::uint8_t data_;
+    pid_t pid_;
     
+    static constexpr std::uint8_t mask_ = 0xFF;
 
 public:
     Breakpoint(pid_t pid, std::intptr_t addr);
@@ -70,7 +78,7 @@ public:
 };
 
 //Debugger Methods
-Debugger::Debugger(pid_t pid, std::string progName) : _pid(pid), _progName(progName) {}
+Debugger::Debugger(pid_t pid, std::string progName) : pid_(pid), progName_(progName) {}
 
 void Debugger::run() {
     char* line;
@@ -89,7 +97,9 @@ void Debugger::handleCommand(std::string args) {
         std::cout << "Continue Execution\n";
     }
     else if(isPrefix(argv[0], "break")) {
-        std::cout << "Placing breakpoint\n";
+        //std::cout << "Placing breakpoint\n";
+        setBreakpointAtAddress(std::stol(strip0x(argv[1]), nullptr, 16));
+        
     }
     else {
         std::cout << "Invalid Command!\n";
@@ -98,31 +108,37 @@ void Debugger::handleCommand(std::string args) {
 
 void Debugger::setBreakpointAtAddress(std::intptr_t address) {    
     std::cout << "Setting Breakpoint at: 0x" << std::hex << address << "\n";    //changed to hex
-    Breakpoint bp = Breakpoint(_pid, address);
+    Breakpoint bp(pid_, address);
     bp.enable();
     
-    _addrToBp[address] = bp;
+    addrToBp_[address] = bp;
     std::cout << "Breakpoint successfully set!\n";
 }
 
 
 //Breakpoint Methods
-Breakpoint::Breakpoint(pid_t pid, std::intptr_t addr) : _pid(pid), _addr(addr) {}
+Breakpoint::Breakpoint(pid_t pid, std::intptr_t addr) : pid_(pid), addr_(addr), enabled_(false), data_(0) {}
+bool Breakpoint::isEnabled() {return enabled_;}     
+std::uint8_t Breakpoint::getData() {return data_;}  
 
-bool Breakpoint::isEnabled() {return _enabled;}
-std::uint8_t Breakpoint::getData() {return _data;}
-
-
-void Breakpoint::enable() { //TODO
+void Breakpoint::enable() { //Optimize?
+    constexpr std::uint64_t int3 = 0xcc;
+    auto word = ptrace(PTRACE_PEEKDATA, addr_, 0, nullptr);
     
+    //Linux is little endian, LSB is first. 0xFF -> 0000 ...00 1111 1111
+    data_ = word & mask_;
+    word = (word & ~mask_) | int3;
 
-    _enabled = true;
+    ptrace(PTRACE_POKEDATA, pid_, addr_, word, nullptr);
+    enabled_ = true;
 }
 
 void Breakpoint::disable() {
-    
+    auto word = ptrace(PTRACE_PEEKDATA, addr_, 0, nullptr);
+    word = ((word & ~mask_) | data_);
 
-    _enabled = false;
+    ptrace(PTRACE_POKEDATA, pid_, addr_, word, nullptr);
+    enabled_ = false;
 }
 
 
