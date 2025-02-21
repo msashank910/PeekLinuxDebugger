@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/ptrace.h>
+#include <sys/wait.h>
 #include <errno.h>
 #include <vector>
 #include <linenoise.h>
@@ -43,26 +44,11 @@ std::vector<std::string> splitLine(const std::string &line, char delimiter) {
 
 
 //Classes
-class Debugger {
-    pid_t pid_;
-    std::string progName_;
-    std::unordered_map<std::intptr_t, Breakpoint> addrToBp_;
-
-    void handleCommand(std::string args);
-
-public:
-    Debugger(int pid, std::string progName);
-    void run();
-    
-    void setBreakpointAtAddress(std::intptr_t address);
-    
-};
-
 class Breakpoint {
-    bool enabled_;
-    std::intptr_t addr_;
-    std::uint8_t data_;
     pid_t pid_;
+    std::intptr_t addr_;
+    bool enabled_;
+    std::uint8_t data_;
     
     static constexpr std::uint8_t mask_ = 0xFF;
 
@@ -77,10 +63,32 @@ public:
 
 };
 
+
+class Debugger {
+    pid_t pid_;
+    std::string progName_;
+    std::unordered_map<std::intptr_t, Breakpoint> addrToBp_;
+
+    void handleCommand(std::string args);
+
+public:
+    Debugger(pid_t pid, std::string progName);
+    void run();
+    
+    void setBreakpointAtAddress(std::intptr_t address);
+    
+};
+
+
+
 //Debugger Methods
 Debugger::Debugger(pid_t pid, std::string progName) : pid_(pid), progName_(progName) {}
 
 void Debugger::run() {
+    int waitStatus;
+    auto options = 0;
+    waitpid(pid_, &waitStatus, options);        //may simiplify later
+
     char* line;
 
     while((line = linenoise("[__pld__] ")) != nullptr) {
@@ -98,8 +106,10 @@ void Debugger::handleCommand(std::string args) {
     }
     else if(isPrefix(argv[0], "break")) {
         //std::cout << "Placing breakpoint\n";
-        setBreakpointAtAddress(std::stol(strip0x(argv[1]), nullptr, 16));
-        
+        if(argv.size() > 1)
+            setBreakpointAtAddress(std::stol(strip0x(argv[1]), nullptr, 16));
+        else
+            std::cout << "Please specify address!\n";
     }
     else {
         std::cout << "Invalid Command!\n";
@@ -108,11 +118,16 @@ void Debugger::handleCommand(std::string args) {
 
 void Debugger::setBreakpointAtAddress(std::intptr_t address) {    
     std::cout << "Setting Breakpoint at: 0x" << std::hex << address << "\n";    //changed to hex
-    Breakpoint bp(pid_, address);
-    bp.enable();
     
-    addrToBp_[address] = bp;
-    std::cout << "Breakpoint successfully set!\n";
+    auto [it, inserted] = addrToBp_.emplace(address, Breakpoint(pid_, address));
+    if(inserted) {
+        it->second.enable();
+        std::cout << "Breakpoint successfully set!\n";
+    }
+    else {
+        std::cout << "Breakpoint already exists!\n";  
+    }
+
 }
 
 
@@ -126,7 +141,7 @@ void Breakpoint::enable() { //Optimize?
     auto word = ptrace(PTRACE_PEEKDATA, addr_, 0, nullptr);
     
     //Linux is little endian, LSB is first. 0xFF -> 0000 ...00 1111 1111
-    data_ = word & mask_;
+    data_ = static_cast<std::uint8_t>(word & mask_);
     word = (word & ~mask_) | int3;
 
     ptrace(PTRACE_POKEDATA, pid_, addr_, word, nullptr);
@@ -151,7 +166,7 @@ int main(int argc, char* argv[]) {
     }
     
     auto progName = argv[1];
-    auto pid = fork();  // runs a child process concurrently to this process
+    pid_t pid = fork();  // runs a child process concurrently to this process
     
     if(pid == 0) {
         std::cout << "Entering child process....\n";
