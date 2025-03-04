@@ -10,6 +10,7 @@
 #include <linenoise.h>
 #include <unordered_map>
 #include <cstdint>
+#include <sys/personality.h>
 
 //cmake --build build to compile if changed this file
 // cmake -B build . along with command above if made changes to CMAKE settings
@@ -73,8 +74,9 @@ class Debugger {
 
 public:
     Debugger(pid_t pid, std::string progName);
+    int getPID();
     void run();
-    
+    void continueExecution();
     void setBreakpointAtAddress(std::intptr_t address);
     
 };
@@ -98,6 +100,8 @@ void Debugger::run() {
     }
 }
 
+int Debugger::getPID() {return pid_;}
+
 void Debugger::handleCommand(std::string args) {
     auto argv = splitLine(args, ' ');
 
@@ -110,6 +114,11 @@ void Debugger::handleCommand(std::string args) {
             setBreakpointAtAddress(std::stol(strip0x(argv[1]), nullptr, 16));
         else
             std::cout << "Please specify address!\n";
+    }
+    else if(isPrefix(argv[0], "pid")) {
+        std::cout << "Retrieving child process ID...\n";
+        std::cout << "pID = " << getPID() << "\n";
+
     }
     else {
         std::cout << "Invalid Command!\n";
@@ -129,6 +138,15 @@ void Debugger::setBreakpointAtAddress(std::intptr_t address) {
     }
 
 }
+
+void Debugger::continueExecution() {
+    ptrace(PTRACE_CONT, pid_, nullptr, nullptr);
+
+    int waitStatus;
+    auto options = 0;
+    waitpid(pid_, &waitStatus, options);
+}
+
 
 
 //Breakpoint Methods
@@ -172,6 +190,7 @@ int main(int argc, char* argv[]) {
         std::cout << "Entering child process....\n";
 
         ptrace(PTRACE_TRACEME, 0, nullptr, nullptr);
+        personality(ADDR_NO_RANDOMIZE);
         execl(progName, progName, nullptr); //second arg declares name as ./prog
         
         perror("The debuggee argument is invalid");
