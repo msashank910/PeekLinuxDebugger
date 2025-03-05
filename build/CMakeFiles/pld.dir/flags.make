@@ -4,7 +4,7 @@
 # compile CXX with /usr/bin/c++
 CXX_DEFINES = 
 
-CXX_INCLUDES = -I/home/msashank910/Projects/LinuxDebugger/build/_deps/linenoise-src -I/home/msashank910/Projects/LinuxDebugger/build/_deps/libelfin-src
+CXX_INCLUDES = -I/home/msashank910/Projects/LinuxDebugger/build/_deps/linenoise-src -I/home/msashank910/Projects/LinuxDebugger/build/_deps/libelfin-src -I/home/msashank910/Projects/LinuxDebugger/include -I/home/msashank910/Projects/LinuxDebugger/src
 
 CXX_FLAGS = -Wall -g
 

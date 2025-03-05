@@ -69,10 +69,24 @@ include CMakeFiles/pld.dir/progress.make
 # Include the compile flags for this target's objects.
 include CMakeFiles/pld.dir/flags.make
 
+CMakeFiles/pld.dir/src/breakpoint.cpp.o: CMakeFiles/pld.dir/flags.make
+CMakeFiles/pld.dir/src/breakpoint.cpp.o: ../src/breakpoint.cpp
+CMakeFiles/pld.dir/src/breakpoint.cpp.o: CMakeFiles/pld.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/msashank910/Projects/LinuxDebugger/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/pld.dir/src/breakpoint.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/pld.dir/src/breakpoint.cpp.o -MF CMakeFiles/pld.dir/src/breakpoint.cpp.o.d -o CMakeFiles/pld.dir/src/breakpoint.cpp.o -c /home/msashank910/Projects/LinuxDebugger/src/breakpoint.cpp
+
+CMakeFiles/pld.dir/src/breakpoint.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/pld.dir/src/breakpoint.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/msashank910/Projects/LinuxDebugger/src/breakpoint.cpp > CMakeFiles/pld.dir/src/breakpoint.cpp.i
+
+CMakeFiles/pld.dir/src/breakpoint.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/pld.dir/src/breakpoint.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/msashank910/Projects/LinuxDebugger/src/breakpoint.cpp -o CMakeFiles/pld.dir/src/breakpoint.cpp.s
+
 CMakeFiles/pld.dir/src/debugger.cpp.o: CMakeFiles/pld.dir/flags.make
 CMakeFiles/pld.dir/src/debugger.cpp.o: ../src/debugger.cpp
 CMakeFiles/pld.dir/src/debugger.cpp.o: CMakeFiles/pld.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/msashank910/Projects/LinuxDebugger/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/pld.dir/src/debugger.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/msashank910/Projects/LinuxDebugger/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object CMakeFiles/pld.dir/src/debugger.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/pld.dir/src/debugger.cpp.o -MF CMakeFiles/pld.dir/src/debugger.cpp.o.d -o CMakeFiles/pld.dir/src/debugger.cpp.o -c /home/msashank910/Projects/LinuxDebugger/src/debugger.cpp
 
 CMakeFiles/pld.dir/src/debugger.cpp.i: cmake_force
@@ -83,20 +97,70 @@ CMakeFiles/pld.dir/src/debugger.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/pld.dir/src/debugger.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/msashank910/Projects/LinuxDebugger/src/debugger.cpp -o CMakeFiles/pld.dir/src/debugger.cpp.s
 
+CMakeFiles/pld.dir/src/main.cpp.o: CMakeFiles/pld.dir/flags.make
+CMakeFiles/pld.dir/src/main.cpp.o: ../src/main.cpp
+CMakeFiles/pld.dir/src/main.cpp.o: CMakeFiles/pld.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/msashank910/Projects/LinuxDebugger/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object CMakeFiles/pld.dir/src/main.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/pld.dir/src/main.cpp.o -MF CMakeFiles/pld.dir/src/main.cpp.o.d -o CMakeFiles/pld.dir/src/main.cpp.o -c /home/msashank910/Projects/LinuxDebugger/src/main.cpp
+
+CMakeFiles/pld.dir/src/main.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/pld.dir/src/main.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/msashank910/Projects/LinuxDebugger/src/main.cpp > CMakeFiles/pld.dir/src/main.cpp.i
+
+CMakeFiles/pld.dir/src/main.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/pld.dir/src/main.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/msashank910/Projects/LinuxDebugger/src/main.cpp -o CMakeFiles/pld.dir/src/main.cpp.s
+
+CMakeFiles/pld.dir/src/register.cpp.o: CMakeFiles/pld.dir/flags.make
+CMakeFiles/pld.dir/src/register.cpp.o: ../src/register.cpp
+CMakeFiles/pld.dir/src/register.cpp.o: CMakeFiles/pld.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/msashank910/Projects/LinuxDebugger/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CXX object CMakeFiles/pld.dir/src/register.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/pld.dir/src/register.cpp.o -MF CMakeFiles/pld.dir/src/register.cpp.o.d -o CMakeFiles/pld.dir/src/register.cpp.o -c /home/msashank910/Projects/LinuxDebugger/src/register.cpp
+
+CMakeFiles/pld.dir/src/register.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/pld.dir/src/register.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/msashank910/Projects/LinuxDebugger/src/register.cpp > CMakeFiles/pld.dir/src/register.cpp.i
+
+CMakeFiles/pld.dir/src/register.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/pld.dir/src/register.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/msashank910/Projects/LinuxDebugger/src/register.cpp -o CMakeFiles/pld.dir/src/register.cpp.s
+
+CMakeFiles/pld.dir/src/util.cpp.o: CMakeFiles/pld.dir/flags.make
+CMakeFiles/pld.dir/src/util.cpp.o: ../src/util.cpp
+CMakeFiles/pld.dir/src/util.cpp.o: CMakeFiles/pld.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/msashank910/Projects/LinuxDebugger/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CXX object CMakeFiles/pld.dir/src/util.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/pld.dir/src/util.cpp.o -MF CMakeFiles/pld.dir/src/util.cpp.o.d -o CMakeFiles/pld.dir/src/util.cpp.o -c /home/msashank910/Projects/LinuxDebugger/src/util.cpp
+
+CMakeFiles/pld.dir/src/util.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/pld.dir/src/util.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/msashank910/Projects/LinuxDebugger/src/util.cpp > CMakeFiles/pld.dir/src/util.cpp.i
+
+CMakeFiles/pld.dir/src/util.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/pld.dir/src/util.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/msashank910/Projects/LinuxDebugger/src/util.cpp -o CMakeFiles/pld.dir/src/util.cpp.s
+
 # Object files for target pld
 pld_OBJECTS = \
-"CMakeFiles/pld.dir/src/debugger.cpp.o"
+"CMakeFiles/pld.dir/src/breakpoint.cpp.o" \
+"CMakeFiles/pld.dir/src/debugger.cpp.o" \
+"CMakeFiles/pld.dir/src/main.cpp.o" \
+"CMakeFiles/pld.dir/src/register.cpp.o" \
+"CMakeFiles/pld.dir/src/util.cpp.o"
 
 # External object files for target pld
 pld_EXTERNAL_OBJECTS =
 
+pld: CMakeFiles/pld.dir/src/breakpoint.cpp.o
 pld: CMakeFiles/pld.dir/src/debugger.cpp.o
+pld: CMakeFiles/pld.dir/src/main.cpp.o
+pld: CMakeFiles/pld.dir/src/register.cpp.o
+pld: CMakeFiles/pld.dir/src/util.cpp.o
 pld: CMakeFiles/pld.dir/build.make
 pld: liblinenoise.a
 pld: _deps/libelfin-src/dwarf/libdwarf++.so
 pld: _deps/libelfin-src/elf/libelf++.so
 pld: CMakeFiles/pld.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/msashank910/Projects/LinuxDebugger/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX executable pld"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/msashank910/Projects/LinuxDebugger/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Linking CXX executable pld"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/pld.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
