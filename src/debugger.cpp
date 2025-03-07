@@ -1,5 +1,7 @@
 #include "../include/debugger.h"
 #include "../include/util.h"
+#include "../include/register.h"
+
 
 #include <linenoise.h>
 #include <iostream>
@@ -7,6 +9,7 @@
 #include <sys/wait.h>
 
 using namespace util;
+using namespace reg;
 
 //Debugger Methods
 Debugger::Debugger(pid_t pid, std::string progName) : pid_(pid), progName_(progName) {}
@@ -14,7 +17,7 @@ Debugger::Debugger(pid_t pid, std::string progName) : pid_(pid), progName_(progN
 void Debugger::run() {
     int waitStatus;
     auto options = 0;
-    waitpid(pid_, &waitStatus, options);        //may simiplify later
+    waitpid(pid_, &waitStatus, options);        //may simplify later
 
     char* line;
 
