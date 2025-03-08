@@ -7,6 +7,8 @@
 #include <iostream>
 #include <sys/ptrace.h>
 #include <sys/wait.h>
+#include <sys/user.h>
+
 
 using namespace util;
 using namespace reg;
@@ -45,8 +47,12 @@ void Debugger::handleCommand(std::string args) {
     }
     else if(isPrefix(argv[0], "pid")) {
         std::cout << "Retrieving child process ID...\n";
-        std::cout << "pID = " << getPID() << "\n";
+        std::cout << std::dec << "pID = " << getPID() << "\n";
 
+    }
+    else if(isPrefix(argv[0], "dump")) {
+        std::cout << "Dumping registers...\n";
+        dumpRegisters();
     }
     else {
         std::cout << "Invalid Command!\n";
@@ -73,4 +79,13 @@ void Debugger::continueExecution() {
     int waitStatus;
     auto options = 0;
     waitpid(pid_, &waitStatus, options);
+}
+
+void Debugger::dumpRegisters() {
+    user_regs_struct rawRegVals;
+    auto regVals = getAllRegisterValues(pid_, rawRegVals);
+    for(auto& rd : regDescriptorList) {     //uppercase vs nouppercase (default)
+        std::cout << rd.regName << ": " << std::hex << std::uppercase << "0x" << *regVals << "\n";    
+        ++regVals;
+    }
 }

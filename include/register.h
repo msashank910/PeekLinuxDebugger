@@ -2,6 +2,10 @@
 
 #include <string>
 #include <array>
+#include <cstdint>
+#include <sys/user.h>
+
+
 
 namespace reg {		//register is a reserved keyword
 	enum class Reg {
@@ -37,12 +41,21 @@ namespace reg {		//register is a reserved keyword
 	inline constexpr int registerCount_ = 27;
 
 	struct regDescriptor {
-		int dwarfNum;
-		std::string regName;
-		Reg r;
+		const int dwarfNum;
+		const std::string regName;
+		const Reg r;
 	};
 
-	extern std::array<regDescriptor, 27> regDescriptorList;
+	extern const std::array<regDescriptor, 27> regDescriptorList;
+
+
+	bool setRegisterValue(pid_t pid, const Reg r, uint64_t val);
+    uint64_t getRegisterValue(const pid_t pid, const Reg r);
+    uint64_t getRegisterValue(const pid_t pid, const int dwarfNum);
+    uint64_t getRegisterValue(const pid_t pid, const std::string& regName);
+    std::string getRegisterName(const Reg r);
+    Reg getRegFromName(const std::string& regName);
+	uint64_t* getAllRegisterValues(const pid_t pid, user_regs_struct& rawRegVals);
 }
 
   

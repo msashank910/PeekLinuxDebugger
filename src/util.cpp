@@ -14,6 +14,7 @@ namespace util {
         }
         return s;
     }
+    
     //isPrefix is declined as inline in util.h
     
     std::vector<std::string> splitLine(const std::string &line, char delimiter) {    

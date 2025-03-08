@@ -169,6 +169,8 @@ CMakeFiles/pld.dir/src/debugger.cpp.o: \
  /usr/include/c++/11/bits/ostream.tcc /usr/include/c++/11/istream \
  /usr/include/c++/11/bits/istream.tcc /usr/include/c++/11/sstream \
  /usr/include/c++/11/bits/sstream.tcc \
+ /home/msashank910/Projects/LinuxDebugger/src/../include/register.h \
+ /usr/include/x86_64-linux-gnu/sys/user.h \
  /home/msashank910/Projects/LinuxDebugger/build/_deps/linenoise-src/linenoise.h \
  /usr/include/x86_64-linux-gnu/sys/ptrace.h \
  /usr/include/x86_64-linux-gnu/bits/ptrace-shared.h \

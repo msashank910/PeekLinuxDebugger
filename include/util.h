@@ -6,7 +6,7 @@
 #include <sstream>
 
 namespace util {
-    std::string strip0x(const std::string& s);
+    std::string strip0x(const std::string& s);  //change function later
     
     inline bool isPrefix(const std::string& a, const std::string& b) {
         return std::equal(a.begin(), a.end(), b.begin());
