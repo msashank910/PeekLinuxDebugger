@@ -166,6 +166,30 @@ _deps/linenoise-src/linenoise.c.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/linenoise.dir/build.make CMakeFiles/linenoise.dir/_deps/linenoise-src/linenoise.c.s
 .PHONY : _deps/linenoise-src/linenoise.c.s
 
+src/breakpoint.o: src/breakpoint.cpp.o
+.PHONY : src/breakpoint.o
+
+# target to build an object file
+src/breakpoint.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/pld.dir/build.make CMakeFiles/pld.dir/src/breakpoint.cpp.o
+.PHONY : src/breakpoint.cpp.o
+
+src/breakpoint.i: src/breakpoint.cpp.i
+.PHONY : src/breakpoint.i
+
+# target to preprocess a source file
+src/breakpoint.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/pld.dir/build.make CMakeFiles/pld.dir/src/breakpoint.cpp.i
+.PHONY : src/breakpoint.cpp.i
+
+src/breakpoint.s: src/breakpoint.cpp.s
+.PHONY : src/breakpoint.s
+
+# target to generate assembly for a file
+src/breakpoint.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/pld.dir/build.make CMakeFiles/pld.dir/src/breakpoint.cpp.s
+.PHONY : src/breakpoint.cpp.s
+
 src/debugger.o: src/debugger.cpp.o
 .PHONY : src/debugger.o
 
@@ -190,6 +214,78 @@ src/debugger.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/pld.dir/build.make CMakeFiles/pld.dir/src/debugger.cpp.s
 .PHONY : src/debugger.cpp.s
 
+src/main.o: src/main.cpp.o
+.PHONY : src/main.o
+
+# target to build an object file
+src/main.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/pld.dir/build.make CMakeFiles/pld.dir/src/main.cpp.o
+.PHONY : src/main.cpp.o
+
+src/main.i: src/main.cpp.i
+.PHONY : src/main.i
+
+# target to preprocess a source file
+src/main.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/pld.dir/build.make CMakeFiles/pld.dir/src/main.cpp.i
+.PHONY : src/main.cpp.i
+
+src/main.s: src/main.cpp.s
+.PHONY : src/main.s
+
+# target to generate assembly for a file
+src/main.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/pld.dir/build.make CMakeFiles/pld.dir/src/main.cpp.s
+.PHONY : src/main.cpp.s
+
+src/register.o: src/register.cpp.o
+.PHONY : src/register.o
+
+# target to build an object file
+src/register.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/pld.dir/build.make CMakeFiles/pld.dir/src/register.cpp.o
+.PHONY : src/register.cpp.o
+
+src/register.i: src/register.cpp.i
+.PHONY : src/register.i
+
+# target to preprocess a source file
+src/register.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/pld.dir/build.make CMakeFiles/pld.dir/src/register.cpp.i
+.PHONY : src/register.cpp.i
+
+src/register.s: src/register.cpp.s
+.PHONY : src/register.s
+
+# target to generate assembly for a file
+src/register.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/pld.dir/build.make CMakeFiles/pld.dir/src/register.cpp.s
+.PHONY : src/register.cpp.s
+
+src/util.o: src/util.cpp.o
+.PHONY : src/util.o
+
+# target to build an object file
+src/util.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/pld.dir/build.make CMakeFiles/pld.dir/src/util.cpp.o
+.PHONY : src/util.cpp.o
+
+src/util.i: src/util.cpp.i
+.PHONY : src/util.i
+
+# target to preprocess a source file
+src/util.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/pld.dir/build.make CMakeFiles/pld.dir/src/util.cpp.i
+.PHONY : src/util.cpp.i
+
+src/util.s: src/util.cpp.s
+.PHONY : src/util.s
+
+# target to generate assembly for a file
+src/util.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/pld.dir/build.make CMakeFiles/pld.dir/src/util.cpp.s
+.PHONY : src/util.cpp.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -203,9 +299,21 @@ help:
 	@echo "... _deps/linenoise-src/linenoise.o"
 	@echo "... _deps/linenoise-src/linenoise.i"
 	@echo "... _deps/linenoise-src/linenoise.s"
+	@echo "... src/breakpoint.o"
+	@echo "... src/breakpoint.i"
+	@echo "... src/breakpoint.s"
 	@echo "... src/debugger.o"
 	@echo "... src/debugger.i"
 	@echo "... src/debugger.s"
+	@echo "... src/main.o"
+	@echo "... src/main.i"
+	@echo "... src/main.s"
+	@echo "... src/register.o"
+	@echo "... src/register.i"
+	@echo "... src/register.s"
+	@echo "... src/util.o"
+	@echo "... src/util.i"
+	@echo "... src/util.s"
 .PHONY : help
 
 

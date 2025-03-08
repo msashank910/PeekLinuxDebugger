@@ -109,12 +109,12 @@ CMakeFiles/linenoise.dir/clean:
 CMakeFiles/pld.dir/all: CMakeFiles/linenoise.dir/all
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/pld.dir/build.make CMakeFiles/pld.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/pld.dir/build.make CMakeFiles/pld.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/msashank910/Projects/LinuxDebugger/build/CMakeFiles --progress-num=3,4 "Built target pld"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/msashank910/Projects/LinuxDebugger/build/CMakeFiles --progress-num=3,4,5,6,7,8 "Built target pld"
 .PHONY : CMakeFiles/pld.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/pld.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/msashank910/Projects/LinuxDebugger/build/CMakeFiles 4
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/msashank910/Projects/LinuxDebugger/build/CMakeFiles 8
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/pld.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/msashank910/Projects/LinuxDebugger/build/CMakeFiles 0
 .PHONY : CMakeFiles/pld.dir/rule

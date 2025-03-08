@@ -41,10 +41,17 @@ pkg_check_modules(LIBDWARF REQUIRED libdwarf++)
 pkg_check_modules(LIBELF REQUIRED libelf++)
 
 # Create the main executable
-add_executable(pld src/debugger.cpp)
+file(GLOB SRC_FILES src/*.cpp)
+add_executable(pld ${SRC_FILES})
+#add_executable(pld src/debugger.cpp)
 
 # Include linenoise and libelfin headers
-target_include_directories(pld PRIVATE ${linenoise_SOURCE_DIR} ${linenoise_SOURCE_DIR} ${libelfin_SOURCE_DIR})
+target_include_directories(pld PRIVATE 
+    ${linenoise_SOURCE_DIR} 
+    ${libelfin_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/src 
+)
 # target_include_directories(pld PRIVATE ${linenoise_SOURCE_DIR} ${linenoise_SOURCE_DIR}/include ${libelfin_SOURCE_DIR})
 
 
