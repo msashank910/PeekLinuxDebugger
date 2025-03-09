@@ -1,6 +1,7 @@
 Peek - A Lightweight Linux Debugger (WIP)
 
-Peek is a lightweight Linux debugger for 64-bit systems, built from scratch in C++. This project is currently a work in progress and aims to provide essential debugging features with a minimalistic approach.
+Peek is a lightweight Linux debugger for 64-bit systems, built from scratch in C++. This project is currently a work in progress and aims to provide essential debugging features with a minimalistic approach. It uses Linenoise for command line editing and Libelfin for parsing ELF and DWARF debugging information.
+
 Features (Implemented)
 
 > Attaching to processes
@@ -19,18 +20,26 @@ Technologies Used:
 
 Clone the repository:
 
-git clone https://github.com/msashank910/PeekLinuxDebugger.git
-cd PeekLinuxDebugger
+    git clone https://github.com/msashank910/PeekLinuxDebugger.git
+    cd PeekLinuxDebugger
 
 Build the project:
 
-cmake -B build . && cmake --build build
+    cmake -B build . && cmake --build build
 
 🖥 Usage
 
 To run the debugger:
 
-sudo ./peek <program-to-debug>
+    ./pld <debuggee_program>
+
+While in the [_pld_] command-line interface, you can interact with the child process via breakpoints, memory manipulation, and register manipulation.
+For a full list of commands, use the help command:
+
+    help
+
+Commands can be executed via their prefixes as well
+For example for continue: cont, con, c all work.
 
 📋 Current Limitations
 
