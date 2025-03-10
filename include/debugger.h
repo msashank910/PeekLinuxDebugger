@@ -20,6 +20,9 @@ class Debugger {
 
 public:
     Debugger(pid_t pid, std::string progName);
-    int getPID();
+    pid_t getPID();
     void run();
+    
+    uint64_t getPC();
+    bool setPC(uint64_t val);
 };

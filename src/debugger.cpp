@@ -30,7 +30,16 @@ void Debugger::run() {
     }
 }
 
-int Debugger::getPID() {return pid_;}
+pid_t Debugger::getPID() {return pid_;}
+
+uint64_t Debugger::getPC() {
+    return getRegisterValue(pid_, Reg::rip);
+}
+
+bool Debugger::setPC(uint64_t val) {
+    return setRegisterValue(pid_, Reg::rip, val);
+}
+
 
 void Debugger::handleCommand(std::string args) {
     auto argv = splitLine(args, ' ');
@@ -40,8 +49,8 @@ void Debugger::handleCommand(std::string args) {
     }
     else if(isPrefix(argv[0], "break")) {
         //std::cout << "Placing breakpoint\n";
-        if(argv.size() > 1)
-            setBreakpointAtAddress(std::stol(strip0x(argv[1]), nullptr, 16));
+        if(argv.size() > 1)     //may change to stoull in future
+            setBreakpointAtAddress(std::stol(strip0x(argv[1]), nullptr, 16)); 
         else
             std::cout << "Please specify address!\n";
     }
@@ -82,6 +91,11 @@ void Debugger::continueExecution() {
 }
 
 void Debugger::dumpRegisters() {
+    /*  Issues:
+        - When dumping, registers with 0 in bytes above lsb are omitted
+        - dumps in a line, kinda looks ugly
+        - maybe format into a neat table
+    */
     user_regs_struct rawRegVals;
     auto regVals = getAllRegisterValues(pid_, rawRegVals);
     for(auto& rd : regDescriptorList) {     //uppercase vs nouppercase (default)

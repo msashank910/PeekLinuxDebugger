@@ -1,4 +1,0 @@
-/home/msashank910/Projects/LinuxDebugger/build/CMakeFiles/linenoise.dir
-/home/msashank910/Projects/LinuxDebugger/build/CMakeFiles/pld.dir
-/home/msashank910/Projects/LinuxDebugger/build/CMakeFiles/edit_cache.dir
-/home/msashank910/Projects/LinuxDebugger/build/CMakeFiles/rebuild_cache.dir
