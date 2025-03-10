@@ -13,8 +13,14 @@ class Debugger {
     std::unordered_map<std::intptr_t, Breakpoint> addrToBp_;
 
     void handleCommand(std::string args);
-    void continueExecution();
+    
     void setBreakpointAtAddress(std::intptr_t address);
+    void continueExecution();
+
+    uint64_t getPC();
+    bool setPC(uint64_t val);
+    pid_t getPID();
+
     bool readMemory(const uint64_t &addr, uint64_t &data);
     bool writeMemory(const uint64_t &addr, uint64_t &data);
 
@@ -22,9 +28,6 @@ class Debugger {
 
 public:
     Debugger(pid_t pid, std::string progName);
-    pid_t getPID();
     void run();
     
-    uint64_t getPC();
-    bool setPC(uint64_t val);
 };

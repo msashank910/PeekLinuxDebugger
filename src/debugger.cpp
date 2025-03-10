@@ -60,6 +60,35 @@ void Debugger::handleCommand(std::string args) {
         std::cout << std::dec << "pID = " << getPID() << "\n";
 
     }
+    else if(isPrefix(argv[0], "register_read") || argv[0] == "rr") {
+        if(argv.size() > 1)  {
+            Reg r = getRegFromName(argv[1]);
+
+            if(r != Reg::INVALID_REG) {
+                std::cout << argv[1] << ": 0x" << getRegisterValue(pid_, r) << "\n";
+            }
+            else {
+                std::cout << "Incorrect Register Name! (ex: r15)\n";
+            }
+        } 
+        else
+            std::cout << "Please specify register!\n";
+    }
+    else if(isPrefix(argv[0], "register_write") || argv[0] == "rw") {
+        if(argv.size() > 2)  {
+            Reg r = getRegFromName(argv[1]);
+            std::string data = strip0x(argv[2]);
+
+            if(r != Reg::INVALID_REG && setRegisterValue(pid_, r, std::stol(data, nullptr, 16))) {
+                std::cout << argv[1] << ": 0x" << getRegisterValue(pid_, r) << " --> 0x" << data << "\n";
+            }
+            else {
+                std::cout << "Incorrect register name or data value! (ex: r15 0xFFFFFFFFFFFFFFFF)\n";
+            }
+        } 
+        else
+            std::cout << "Please specify register and data!\n";
+    }
     else if(isPrefix(argv[0], "dump")) {
         std::cout << "Dumping registers...\n";
         dumpRegisters();
@@ -134,6 +163,7 @@ void Debugger::dumpRegisters() {
     }
 }
 
+//add support for multiple words eventually (check notes/TODO)
 bool Debugger::readMemory(const uint64_t &addr, uint64_t &data) {  //PEEKDATA, show errors if needed
     errno = 0;
     long res = ptrace(PTRACE_PEEKDATA, pid_, &addr, &data);
