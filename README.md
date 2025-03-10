@@ -30,8 +30,8 @@ Build the project:
 🖥 Usage
 
 To run the debugger:
-
-    ./pld <debuggee_program>
+    
+    ./build/pld ./<file_path_to_debuggee_program>
 
 While in the [_pld_] command-line interface, you can interact with the child process via breakpoints, memory manipulation, and register manipulation.
 For a full list of commands, use the help command:
