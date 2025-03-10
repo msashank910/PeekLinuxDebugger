@@ -15,7 +15,9 @@ class Debugger {
     void handleCommand(std::string args);
     void continueExecution();
     void setBreakpointAtAddress(std::intptr_t address);
-    
+    bool readMemory(const uint64_t &addr, uint64_t &data);
+    bool writeMemory(const uint64_t &addr, uint64_t &data);
+
     void dumpRegisters();
 
 public:

@@ -8,6 +8,7 @@
 #include <sys/ptrace.h>
 #include <sys/wait.h>
 #include <sys/user.h>
+#include <cstring>
 
 
 using namespace util;
@@ -63,6 +64,35 @@ void Debugger::handleCommand(std::string args) {
         std::cout << "Dumping registers...\n";
         dumpRegisters();
     }
+    else if(isPrefix(argv[0], "read_memory")) {
+        if(argv.size() > 1)  {
+            uint64_t data;
+            std::string addr = strip0x(argv[1]);
+
+            if(readMemory(std::stol(addr, nullptr, 16), data)) {
+                std::cout << "Memory at 0x" << addr << ": " << data << "\n";
+            }
+        } 
+        else
+            std::cout << "Please specify address!\n";
+    }
+    else if(isPrefix(argv[0], "write_memory")) {
+        if(argv.size() > 1)  {
+            uint64_t data;
+            std::string addr = strip0x(argv[1]);
+
+            writeMemory(std::stol(addr, nullptr, 16), data);
+
+            if(readMemory(std::stol(addr, nullptr, 16), data)) {
+                std::cout << "Memory at 0x" << addr << ": " << data << "\n";
+            }
+        } 
+        else
+            std::cout << "Please specify address!\n";
+    }
+    else if(argv[0] == "pc") {
+        std::cout << "Retrieving program counter...\n" << "Program Counter (rip): " << getPC() << "\n";
+    }
     else {
         std::cout << "Invalid Command!\n";
     }
@@ -102,4 +132,26 @@ void Debugger::dumpRegisters() {
         std::cout << rd.regName << ": " << std::hex << std::uppercase << "0x" << *regVals << "\n";    
         ++regVals;
     }
+}
+
+bool Debugger::readMemory(const uint64_t &addr, uint64_t &data) {  //PEEKDATA, show errors if needed
+    errno = 0;
+    long res = ptrace(PTRACE_PEEKDATA, pid_, &addr, &data);
+
+    if(errno && res == -1) {
+        std::cerr << "ptrace error: " << strerror(errno) << ".\n Check Memory Address!\n";
+        return false;
+    }
+    return true;
+}
+
+bool Debugger::writeMemory(const uint64_t &addr, uint64_t &data) {
+    errno = 0;
+    long res = ptrace(PTRACE_POKEDATA, pid_, &addr, &data);
+
+    if(errno && res == -1) {
+        std::cerr << "ptrace error: " << strerror(errno) << ".\n Check Memory Address!\n";
+        return false;
+    }
+    return true;
 }
