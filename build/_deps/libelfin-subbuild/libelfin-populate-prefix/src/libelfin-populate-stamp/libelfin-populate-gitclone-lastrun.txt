@@ -1,3 +1,0 @@
-repository='https://github.com/TartanLlama/libelfin.git'
-module=''
-tag='origin'

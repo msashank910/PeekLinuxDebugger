@@ -35,7 +35,8 @@ namespace reg {		//register is a reserved keyword
 		ds,
 		es,
 		fs,
-		gs
+		gs,
+		INVALID_REG
 	  };
 	  
 	inline constexpr int registerCount_ = 27;
@@ -52,7 +53,9 @@ namespace reg {		//register is a reserved keyword
 	bool setRegisterValue(pid_t pid, const Reg r, uint64_t val);
     uint64_t getRegisterValue(const pid_t pid, const Reg r);
     uint64_t getRegisterValue(const pid_t pid, const int dwarfNum);
-    uint64_t getRegisterValue(const pid_t pid, const std::string& regName);
+
+    //uint64_t getRegisterValue(const pid_t pid, const std::string& regName);	//*** MARKED FOR DELETION***
+
     std::string getRegisterName(const Reg r);
     Reg getRegFromName(const std::string& regName);
 	uint64_t* getAllRegisterValues(const pid_t pid, user_regs_struct& rawRegVals);

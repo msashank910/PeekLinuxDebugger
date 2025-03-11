@@ -39,6 +39,7 @@ namespace reg {
     }};
 
 	bool setRegisterValue(pid_t pid, Reg r, uint64_t val) {
+		errno = 0;
 		user_regs_struct regVals;
 		ptrace(PTRACE_GETREGS, pid, nullptr, &regVals);
 
@@ -49,7 +50,7 @@ namespace reg {
 		);
 		*(reinterpret_cast<uint64_t*>(&regVals) + (it - regDescriptorList.begin())) = val;
 
-		return !(ptrace(PTRACE_SETREGS, pid, nullptr, &regVals));
+		return !(ptrace(PTRACE_SETREGS, pid, nullptr, &regVals)) && !errno;
 	}
 
     uint64_t getRegisterValue(const pid_t pid, const Reg r) {
@@ -78,19 +79,21 @@ namespace reg {
 		return *(reinterpret_cast<uint64_t*>(&regVals) + (it - regDescriptorList.begin()));
 	}
 
-    uint64_t getRegisterValue(const pid_t pid, const std::string& regName) {
-		user_regs_struct regVals;
-		ptrace(PTRACE_GETREGS, pid, nullptr, &regVals);
+	//***BELOW MARKED FOR DELETION***
 
-		//auto&& -> reference to const regDescriptor struct
-		auto it =
-			std::find_if(regDescriptorList.begin(), regDescriptorList.end(), [regName](auto&& rd) {
-				return regName == rd.regName;
-			}
-		);
-		return *(reinterpret_cast<uint64_t*>(&regVals) + (it - regDescriptorList.begin()));
+    // uint64_t getRegisterValue(const pid_t pid, const std::string& regName) {
+	// 	user_regs_struct regVals;
+	// 	ptrace(PTRACE_GETREGS, pid, nullptr, &regVals);
 
-	}
+	// 	//auto&& -> reference to const regDescriptor struct
+	// 	auto it =
+	// 		std::find_if(regDescriptorList.begin(), regDescriptorList.end(), [regName](auto&& rd) {
+	// 			return regName == rd.regName;
+	// 		}
+	// 	);
+	// 	return *(reinterpret_cast<uint64_t*>(&regVals) + (it - regDescriptorList.begin()));
+
+	// }
 
     std::string getRegisterName(const Reg r) {
 		return std::find_if(regDescriptorList.begin(), regDescriptorList.end(), [r](auto&& rd){
@@ -99,9 +102,13 @@ namespace reg {
 	}
 
     Reg getRegFromName(const std::string& regName) {
-		return std::find_if(regDescriptorList.begin(), regDescriptorList.end(), [regName](auto&& rd){
+		auto it = std::find_if(regDescriptorList.begin(), regDescriptorList.end(), [regName](auto&& rd){
 			return rd.regName == regName;
-		})->r;
+		});
+
+		if(it == regDescriptorList.end())
+			return Reg::INVALID_REG;
+		return it->r;
 	}
 
 	uint64_t* getAllRegisterValues(const pid_t pid, user_regs_struct& rawRegVals) {

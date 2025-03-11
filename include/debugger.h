@@ -10,16 +10,27 @@
 class Debugger {
     pid_t pid_;
     std::string progName_;
+    bool exit_;
     std::unordered_map<std::intptr_t, Breakpoint> addrToBp_;
 
-    void handleCommand(std::string args);
-    void continueExecution();
-    void setBreakpointAtAddress(std::intptr_t address);
+    bool handleCommand(std::string args);   //returns if command was processed
     
+    void setBreakpointAtAddress(std::intptr_t address);
+    void continueExecution();
+    bool singleStep();
+    bool stepOverBreakpoint();
+    void waitForSignal();
+
+    uint64_t getPC();
+    bool setPC(uint64_t val);
+    pid_t getPID();
+
+    bool readMemory(const uint64_t &addr, uint64_t &data);
+    bool writeMemory(const uint64_t &addr, uint64_t &data);
     void dumpRegisters();
 
 public:
     Debugger(pid_t pid, std::string progName);
-    int getPID();
     void run();
+    
 };
