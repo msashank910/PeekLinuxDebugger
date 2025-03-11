@@ -16,6 +16,9 @@ class Debugger {
     
     void setBreakpointAtAddress(std::intptr_t address);
     void continueExecution();
+    bool singleStep();
+    bool stepOverBreakpoint();
+    void waitForSignal();
 
     uint64_t getPC();
     bool setPC(uint64_t val);
@@ -23,7 +26,6 @@ class Debugger {
 
     bool readMemory(const uint64_t &addr, uint64_t &data);
     bool writeMemory(const uint64_t &addr, uint64_t &data);
-
     void dumpRegisters();
 
 public:

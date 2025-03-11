@@ -46,7 +46,8 @@ void Debugger::handleCommand(std::string args) {
     auto argv = splitLine(args, ' ');
 
     if(isPrefix(argv[0], "continue")) {
-        std::cout << "Continue Execution\n";
+        std::cout << "Continue Execution...\n";
+        continueExecution();
     }
     else if(isPrefix(argv[0], "break")) {
         //std::cout << "Placing breakpoint\n";
@@ -141,13 +142,6 @@ void Debugger::setBreakpointAtAddress(std::intptr_t address) {
 
 }
 
-void Debugger::continueExecution() {
-    ptrace(PTRACE_CONT, pid_, nullptr, nullptr);
-
-    int waitStatus;
-    auto options = 0;
-    waitpid(pid_, &waitStatus, options);
-}
 
 void Debugger::dumpRegisters() {
     /*  Issues:
@@ -184,4 +178,42 @@ bool Debugger::writeMemory(const uint64_t &addr, uint64_t &data) {
         return false;
     }
     return true;
+}
+
+void Debugger::continueExecution() {
+    stepOverBreakpoint();
+    ptrace(PTRACE_CONT, pid_, nullptr, nullptr);
+    waitForSignal();
+}
+
+bool Debugger::singleStep() {
+    errno = 0;
+    long res = ptrace(PTRACE_SINGLESTEP, pid_, nullptr, nullptr);
+    
+    if(errno && res == -1) {
+        std::cerr << "ptrace error: " << strerror(errno) << ".\n Single Step Failed!\n";
+        return false;
+    }
+    return true;
+}
+bool Debugger::stepOverBreakpoint() {
+    uint64_t addr = getPC() - 1;
+    if(setPC(addr) && singleStep()) {
+        if(addrToBp_.count(static_cast<intptr_t>(addr))) {
+            addrToBp_[static_cast<intptr_t>(addr)].disable();
+        }
+    }
+    else {
+        std::cerr << "SetPC() failed!\n";
+    }
+}
+
+void Debugger::waitForSignal() {
+    int options = 0;
+    int wait_status;
+    errno = 0;
+
+    if(waitpid(pid_, &wait_status, options) == -1 && errno) {
+        std::cerr << "ptrace error: " << strerror(errno) << ".\n WaitPid failed!\n";
+    }
 }
