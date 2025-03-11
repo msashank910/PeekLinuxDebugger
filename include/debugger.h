@@ -10,9 +10,10 @@
 class Debugger {
     pid_t pid_;
     std::string progName_;
+    bool exit_;
     std::unordered_map<std::intptr_t, Breakpoint> addrToBp_;
 
-    void handleCommand(std::string args);
+    bool handleCommand(std::string args);   //returns if command was processed
     
     void setBreakpointAtAddress(std::intptr_t address);
     void continueExecution();
