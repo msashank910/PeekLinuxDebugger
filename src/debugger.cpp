@@ -96,13 +96,9 @@ bool Debugger::handleCommand(std::string args) {
             }
 
             auto oldVal = getRegisterValue(pid_, r);
-            if(setRegisterValue(pid_, r, std::stol(data, nullptr, 16))) {
-                std::cout << std::hex << std::uppercase 
-                    << argv[1] << ": 0x" << oldVal << " --> 0x" << getRegisterValue(pid_, r);
-            }
-            else {
-                std::cout << "Incorrect register name or data value! (ex: r15 0xFFFFFFFFFFFFFFFF)";
-            }
+            setRegisterValue(pid_, r, std::stol(data, nullptr, 16)); 
+            std::cout << std::hex << std::uppercase 
+                << argv[1] << ": 0x" << oldVal << " --> 0x" << getRegisterValue(pid_, r);
         } 
         else
             std::cout << "Please specify register and data!";
@@ -119,11 +115,9 @@ bool Debugger::handleCommand(std::string args) {
         if(argv.size() > 1)  {
             uint64_t data;
             std::string addr = strip0x(argv[1]);
-
-            if(readMemory(std::stol(addr, nullptr, 16), data)) {
-                std::cout << std::hex << std::uppercase 
-                    << "Memory at 0x" << addr << ": " << data;
-            }
+            readMemory(std::stol(addr, nullptr, 16), data);
+            std::cout << std::hex << std::uppercase 
+                << "Memory at 0x" << addr << ": " << data;
         } 
         else
             std::cout << "Please specify address!";
@@ -133,10 +127,9 @@ bool Debugger::handleCommand(std::string args) {
             uint64_t data;
             std::string addr = strip0x(argv[1]);
 
-            if(writeMemory(std::stol(addr, nullptr, 16), data)) {
-                std::cout << std::hex << std::uppercase << "Memory at 0x" << addr 
-                    << ": " << data;
-            }
+            writeMemory(std::stol(addr, nullptr, 16), data);
+            std::cout << std::hex << std::uppercase << "Memory at 0x" << addr 
+                << ": " << data;
         } 
         else
             std::cout << "Please specify address!";
@@ -226,13 +219,8 @@ bool Debugger::writeMemory(const uint64_t &addr, uint64_t &data) {
 
 void Debugger::continueExecution() {
     if(stepOverBreakpoint()) {
-        //std::cout << "Stepped over breakpoint!\n";
         ptrace(PTRACE_CONT, pid_, nullptr, nullptr);
-        //std::cout << "Continuing ptrace is ok!\n";
-
         waitForSignal();
-        //std::cout << "waited for signal!\n";
-
     }
     else {
         std::cout << "\nStep over Breakpoint failed! Cannot Continue Execution.";
