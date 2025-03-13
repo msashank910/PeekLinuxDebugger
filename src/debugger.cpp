@@ -90,9 +90,15 @@ bool Debugger::handleCommand(std::string args) {
             Reg r = getRegFromName(argv[1]);
             std::string data = strip0x(argv[2]);
 
-            if(r != Reg::INVALID_REG && setRegisterValue(pid_, r, std::stol(data, nullptr, 16))) {
+            if(r == Reg::INVALID_REG) {
+                std::cout << "Incorrect register name!";
+                return true;
+            }
+
+            auto oldVal = getRegisterValue(pid_, r);
+            if(setRegisterValue(pid_, r, std::stol(data, nullptr, 16))) {
                 std::cout << std::hex << std::uppercase 
-                    << argv[1] << ": 0x" << getRegisterValue(pid_, r) << " --> 0x" << data;
+                    << argv[1] << ": 0x" << oldVal << " --> 0x" << getRegisterValue(pid_, r);
             }
             else {
                 std::cout << "Incorrect register name or data value! (ex: r15 0xFFFFFFFFFFFFFFFF)";
@@ -101,9 +107,13 @@ bool Debugger::handleCommand(std::string args) {
         else
             std::cout << "Please specify register and data!";
     }
-    else if(isPrefix(argv[0], "dump_registers") || argv[0] == "dr") {
+    else if(argv[0] == "dump_registers" || argv[0] == "dr") {
         std::cout << "Dumping registers...";
         dumpRegisters();
+    }
+    else if(argv[0] == "dump_breakpoints" || argv[0] == "db") {
+        std::cout << "Dumping breakpoints...\n";
+        dumpBreakpoints();
     }
     else if(argv[0] == "read_memory" || argv[0] == "rm") {
         if(argv.size() > 1)  {
@@ -137,6 +147,10 @@ bool Debugger::handleCommand(std::string args) {
     }
     else if(argv[0] == "help") {
         std::cout << "Welcome to Peek!";
+    }
+    else if(argv[0] == "q" || argv[0] == "e" || argv[0] == "exit" || argv[0] ==  "quit") {
+        std::cout << "Exiting....";
+        exit_ = true;
     }
     else {
         std::cout << "Invalid Command!";
@@ -172,6 +186,18 @@ void Debugger::dumpRegisters() {
     for(auto& rd : regDescriptorList) {     //uppercase vs nouppercase (default)
         std::cout << "\n" << rd.regName << ": " << std::hex << std::uppercase << "0x" << *regVals;    
         ++regVals;
+    }
+}
+
+void Debugger::dumpBreakpoints() {
+    if(addrToBp_.empty()) {
+        std::cout << "No breakpoints set!";
+        return;
+    }
+    int count = 1;
+    for(auto it = addrToBp_.begin(); it != addrToBp_.end(); ++it) {
+        std::cout << "\n" << count << ") 0x" << it->first << " (" 
+            << ((it->second.isEnabled()) ? "enabled" : "disabled") << ")";
     }
 }
 
@@ -229,21 +255,19 @@ bool Debugger::singleStep() {
 }
 bool Debugger::stepOverBreakpoint() {
     uint64_t addr = getPC() - 1;
-    if(setPC(addr)) {
-        auto it = addrToBp_.find(static_cast<intptr_t>(addr));
-        
-        if(it != addrToBp_.end()) {
-            if(it->second.isEnabled()){
-                it->second.disable();
-            }
-            if(singleStep()){
-                it->second.enable();
-            }
+    auto it = addrToBp_.find(static_cast<intptr_t>(addr));
+    bool ret = true;
+
+    if(it != addrToBp_.end()) {
+        if(it->second.isEnabled()) {
+            ret = setPC(addr);
+            it->second.disable();
+            ret = ret && singleStep();
+            it->second.enable();
         }
-        return true;
+        
     }
-    std::cerr << "SetPC() failed!\n";
-    return false;
+    return ret;
 }
 
 void Debugger::waitForSignal() {
