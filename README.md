@@ -4,11 +4,11 @@ Peek is a lightweight Linux debugger for 64-bit systems, built from scratch in C
 
 Features (Implemented)
 
-> Attaching to processes
-> Setting breakpoints
-> Inspecting registers
-> Memory manipulation
-> Single-Step
+- Attaching to processes
+- Setting breakpoints
+- Inspecting registers
+- Memory manipulation
+- Single-Step
 
 Technologies Used:
 
@@ -20,8 +20,8 @@ Technologies Used:
 
 Clone the repository:
 
-    git clone https://github.com/msashank910/PeekLinuxDebugger.git
-    cd PeekLinuxDebugger
+    git clone https://github.com/msashank910/Peek.git
+    cd Peek
 
 Build the project:
 
