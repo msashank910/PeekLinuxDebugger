@@ -25,7 +25,7 @@ Clone the repository:
 
 Build the project:
 
-    mkdir build && cmake -B build . && cmake --build build
+    mkdir -p build && cmake -B build . && cmake --build build
 
 🖥 Usage
 
