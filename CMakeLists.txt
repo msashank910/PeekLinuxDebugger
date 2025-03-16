@@ -16,7 +16,7 @@ FetchContent_Declare(
 FetchContent_Declare(
     libelfin
     GIT_REPOSITORY https://github.com/TartanLlama/libelfin.git
-    GIT_TAG master
+    GIT_TAG fbreg
 )
 
 # Download the dependencies

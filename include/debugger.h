@@ -16,6 +16,7 @@ class Debugger {
     bool handleCommand(std::string args);   //returns if command was processed
     
     void setBreakpointAtAddress(std::intptr_t address);
+    void dumpBreakpoints();
     void continueExecution();
     bool singleStep();
     bool stepOverBreakpoint();
