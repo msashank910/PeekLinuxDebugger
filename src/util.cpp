@@ -1,6 +1,7 @@
 #include "../include/util.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 #include <iostream>
 #include <sstream>
@@ -10,9 +11,9 @@
 //Helpers 
 
 namespace util {
-    std::string strip0x(const std::string& s) {          //maybe change later
+    std::string_view strip0x(const std::string_view& s) {          //maybe change later
         if(!s.empty() && s.length() > 2 && s[0] == '0' && s[1] == 'x') {
-            return std::string(s.begin() + 2, s.end());
+            return s.substr(2);
         }
         return s;
     }

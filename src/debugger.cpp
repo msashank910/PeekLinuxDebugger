@@ -113,17 +113,19 @@ bool Debugger::handleCommand(std::string args) {
     }
     else if(isPrefix(argv[0], "breakpoint")) {
         //std::cout << "Placing breakpoint\n";
-        if(argv.size() > 1 && !argv[1].empty())   {  //may change to stoull in future 
+        if(argv.size() > 1)   {  //may change to stoull in future 
             uint64_t num;
-            argv[1] = strip0x(argv[1]);
+            auto stripped0xAddr = strip0x(argv[1]);
             
-            if(argv[1][0] == '*' && validStol(num, std::string_view(argv[1]).substr(1))
+            if(!stripped0xAddr.empty() && stripped0xAddr[0] == '*' 
+                && validStol(num, stripped0xAddr.substr(1))
                 && num < UINT64_MAX - loadAddress_) {
+    
                 num += loadAddress_;
                 setBreakpointAtAddress(std::bit_cast<intptr_t>(num));
 
             }
-            else if(validStol(num, argv[1]) && num < UINT64_MAX - loadAddress_) {
+            else if(validStol(num, stripped0xAddr) && num < UINT64_MAX - loadAddress_) {
                 setBreakpointAtAddress(std::bit_cast<intptr_t>(num));
 
             }
@@ -161,7 +163,7 @@ bool Debugger::handleCommand(std::string args) {
     else if(argv[0] == "register_write" || argv[0] == "rw") {
         if(argv.size() > 2)  {
             Reg r = getRegFromName(argv[1]);
-            std::string data = strip0x(argv[2]);
+            auto stripped0xData = strip0x(argv[2]);
 
             if(r == Reg::INVALID_REG) {
                 std::cout << "Incorrect register name!";
@@ -169,9 +171,15 @@ bool Debugger::handleCommand(std::string args) {
             }
 
             auto oldVal = getRegisterValue(pid_, r);
-            setRegisterValue(pid_, r, std::stol(data, nullptr, 16)); 
-            std::cout << std::hex << std::uppercase 
+            uint64_t data; 
+            if(!validStol(data, stripped0xData)) {
+                std::cout << "Please specify valid data!";
+            }
+            else {
+                setRegisterValue(pid_, r, data); 
+                std::cout << std::hex << std::uppercase 
                 << argv[1] << ": 0x" << oldVal << " --> 0x" << getRegisterValue(pid_, r);
+            }
         } 
         else
             std::cout << "Please specify register and data!";
@@ -186,23 +194,38 @@ bool Debugger::handleCommand(std::string args) {
     }
     else if(argv[0] == "read_memory" || argv[0] == "rm") {
         if(argv.size() > 1)  {
-            uint64_t data;
-            std::string addr = strip0x(argv[1]);
-            readMemory(std::stol(addr, nullptr, 16), data);
-            std::cout << std::hex << std::uppercase 
-                << "Memory at 0x" << addr << ": " << data;
+            uint64_t addr;
+            auto stripped0xaddr = strip0x(argv[1]);
+
+            if(!validStol(addr, stripped0xaddr)) {
+                std::cout << "Please specify valid address!";
+            }
+            else {
+                uint64_t data;
+                readMemory(addr, data);
+                std::cout << std::hex << std::uppercase 
+                << "Read to memory at 0x" << addr << "--> " << data;
+            }
+            
         } 
         else
             std::cout << "Please specify address!";
     }
     else if(argv[0] == "write_memory" || argv[0] == "wm") {
         if(argv.size() > 1)  {
-            uint64_t data;
-            std::string addr = strip0x(argv[1]);
+            uint64_t addr;
+            auto stripped0xaddr = strip0x(argv[1]);
 
-            writeMemory(std::stol(addr, nullptr, 16), data);
-            std::cout << std::hex << std::uppercase << "Memory at 0x" << addr 
-                << ": " << data;
+            if(!validStol(addr, stripped0xaddr)) {
+                std::cout << "Please specify valid address!";
+            }
+            else {
+                uint64_t data;
+                writeMemory(addr, data);
+                std::cout << std::hex << std::uppercase << "Written to memory at 0x" << addr 
+                << "--> " << data;
+            }
+            
         } 
         else
             std::cout << "Please specify address!";
@@ -268,19 +291,20 @@ void Debugger::dumpBreakpoints() {
 }
 
 //add support for multiple words eventually (check notes/TODO)
-void Debugger::readMemory(const uint64_t &addr, uint64_t &data) {  //PEEKDATA, show errors if needed
+void Debugger::readMemory(const uint64_t addr, uint64_t &data) {  //PEEKDATA, show errors if needed
     errno = 0;
-    long res = ptrace(PTRACE_PEEKDATA, pid_, &addr, &data);
-
+    long res = ptrace(PTRACE_PEEKDATA, pid_, addr, nullptr);
+    data = std::bit_cast<uint64_t>(res);
+    
     if(errno && res == -1) {
         throw std::runtime_error("ptrace error: " + std::string(strerror(errno)) + 
             ".\n Check Memory Address!\n");
     }
 }
 
-void Debugger::writeMemory(const uint64_t &addr, uint64_t &data) {
+void Debugger::writeMemory(const uint64_t addr, const uint64_t &data) {
     errno = 0;
-    long res = ptrace(PTRACE_POKEDATA, pid_, &addr, &data);
+    long res = ptrace(PTRACE_POKEDATA, pid_, addr, data);
 
     if(errno && res == -1) {
         throw std::runtime_error("ptrace error: " + std::string(strerror(errno)) + 
@@ -310,7 +334,7 @@ void Debugger::singleStep() {
     //return true;
 }
 void Debugger::stepOverBreakpoint() {
-    uint64_t addr = getPC() - 1;
+    uint64_t addr = getPC();        //pc points to bp, is altered
     auto it = addrToBp_.find(std::bit_cast<intptr_t>(addr));
 
     if(it != addrToBp_.end()) {
@@ -426,7 +450,7 @@ void Debugger::handleSIGTRAP(siginfo_t signal) {
     switch(signal.si_code) {
         case SI_KERNEL:
         case TRAP_BRKPT: {
-            setPC(getPC() - 1);
+            setPC(getPC() - 1); //pc is being decremented for stepOverBreakpoint()
             std::cout << "Hit breakpoint at: " << std::hex << std::uppercase << getPC() << "\n";
             auto offset = getPCOffsetAddress();
             auto lineEntryItr = getLineEntryFromPC(offset);
@@ -434,7 +458,9 @@ void Debugger::handleSIGTRAP(siginfo_t signal) {
             return;
         }
         case 0:
+            return;
         case TRAP_TRACE:
+            std::cout << "Single-Stepping\n";
             return;
     
         default:

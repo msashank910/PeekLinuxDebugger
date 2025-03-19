@@ -42,8 +42,8 @@ class Debugger {
     uint64_t offsetLoadAddress(uint64_t addr);
     uint64_t getPCOffsetAddress();
 
-    void readMemory(const uint64_t &addr, uint64_t &data);
-    void writeMemory(const uint64_t &addr, uint64_t &data);
+    void readMemory(const uint64_t addr, uint64_t &data);
+    void writeMemory(const uint64_t addr, const uint64_t &data);
     void dumpRegisters();
 
     dwarf::die getFunctionFromPC(uint64_t pc);
