@@ -4,25 +4,40 @@
 
 
 #include <linenoise.h>
+#include <dwarf/dwarf++.hh>
+#include <elf/elf++.hh>
+
 #include <iostream>
+#include <fstream>
 #include <sys/ptrace.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <signal.h>
 #include <sys/wait.h>
 #include <sys/user.h>
 #include <cstring>
+#include <memory>
+#include <stdexcept>
+#include <algorithm>
 
 
 using namespace util;
 using namespace reg;
 
 //Debugger Methods
-Debugger::Debugger(pid_t pid, std::string progName) : pid_(pid), progName_(progName), exit_(false) {}
+Debugger::Debugger(pid_t pid, std::string progName) : pid_(pid), progName_(std::move(progName)), exit_(false) {
+    auto fd = open(progName_.c_str(), O_RDONLY);
+    
+    elf_ = elf::elf(elf::create_mmap_loader(fd));
+    dwarf_ = dwarf::dwarf(dwarf::elf::create_loader(elf_));
+
+    context_ = 4;
+
+}
 
 void Debugger::run() {
-    // int waitStatus;
-    // auto options = 0;
-    // waitpid(pid_, &waitStatus, options);        //may simplify later
-
     waitForSignal();
+    initializeLoadAddress();
 
     char* line;
 
@@ -33,15 +48,51 @@ void Debugger::run() {
     }
 }
 
+void Debugger::initializeLoadAddress() {
+    if(elf_.get_hdr().type == elf::et::dyn) {
+        
+        std::unique_ptr<char, decltype(&free)> ptr(realpath(progName_.c_str(), nullptr), free);
+        if(!ptr) {
+            throw std::logic_error("Invalid or nonexistant program name, realpath() failed!");
+        }
+
+        std::string absFilePath = ptr.get();
+
+        std::ifstream file;
+        file.open("/proc/" + std::to_string(getPID()) + "/maps");
+        std::string addr = "";
+        std::string possibleFilePath = "";
+
+        std::getline(file, addr, '-');
+        std::getline(file, possibleFilePath, '\n');
+        possibleFilePath.erase(0, possibleFilePath.find_last_of(" \t") + 1);
+
+        while(possibleFilePath != absFilePath && std::getline(file, addr, '-')) {
+            std::getline(file, possibleFilePath, '\n');
+            possibleFilePath.erase(0, possibleFilePath.find_last_of(" \t") + 1);
+        } 
+        
+        loadAddress_ = std::stol(addr, nullptr, 16);
+
+    }
+    else
+        loadAddress_ = 0;
+}
+
+uint64_t Debugger::offsetLoadAddress(uint64_t addr) { return addr - loadAddress_;}
+
+uint64_t Debugger::getPCOffsetAddress() {return offsetLoadAddress(getPC());}
+
 pid_t Debugger::getPID() {return pid_;}
 
-uint64_t Debugger::getPC() {
-    return getRegisterValue(pid_, Reg::rip);
-}
+uint64_t Debugger::getPC() { return getRegisterValue(pid_, Reg::rip); }
 
-bool Debugger::setPC(uint64_t val) {
-    return setRegisterValue(pid_, Reg::rip, val);
-}
+bool Debugger::setPC(uint64_t val) { return setRegisterValue(pid_, Reg::rip, val); }
+
+unsigned Debugger::getContext() {return context_;}
+
+void Debugger::setContext(unsigned context) {context_ = context;}
+
 
 
 bool Debugger::handleCommand(std::string args) {
@@ -51,7 +102,7 @@ bool Debugger::handleCommand(std::string args) {
     auto argv = splitLine(args, ' ');
 
     if(isPrefix(argv[0], "continue_execution")) {
-        std::cout << "Continue Execution..." << std::endl;
+        std::cout << "Continue Execution...";
         continueExecution();
     }
     else if(isPrefix(argv[0], "breakpoint")) {
@@ -188,74 +239,114 @@ void Debugger::dumpBreakpoints() {
         return;
     }
     int count = 1;
-    for(auto it = addrToBp_.begin(); it != addrToBp_.end(); ++it) {
-        std::cout << "\n" << count << ") 0x" << it->first << " (" 
-            << ((it->second.isEnabled()) ? "enabled" : "disabled") << ")";
+    for(auto& it : addrToBp_) {
+        std::cout << "\n" << count << ") 0x" << it.first << " (" 
+            << ((it.second.isEnabled()) ? "enabled" : "disabled") << ")";
     }
 }
 
 //add support for multiple words eventually (check notes/TODO)
-bool Debugger::readMemory(const uint64_t &addr, uint64_t &data) {  //PEEKDATA, show errors if needed
+void Debugger::readMemory(const uint64_t &addr, uint64_t &data) {  //PEEKDATA, show errors if needed
     errno = 0;
     long res = ptrace(PTRACE_PEEKDATA, pid_, &addr, &data);
 
     if(errno && res == -1) {
-        std::cerr << "ptrace error: " << strerror(errno) << ".\n Check Memory Address!\n";
-        return false;
+        throw std::runtime_error("ptrace error: " + std::string(strerror(errno)) + 
+            ".\n Check Memory Address!\n");
     }
-    return true;
 }
 
-bool Debugger::writeMemory(const uint64_t &addr, uint64_t &data) {
+void Debugger::writeMemory(const uint64_t &addr, uint64_t &data) {
     errno = 0;
     long res = ptrace(PTRACE_POKEDATA, pid_, &addr, &data);
 
     if(errno && res == -1) {
-        std::cerr << "ptrace error: " << strerror(errno) << ".\n Check Memory Address!\n";
-        return false;
+        throw std::runtime_error("ptrace error: " + std::string(strerror(errno)) + 
+            ".\n Check Memory Address!\n");
     }
-    return true;
 }
 
 void Debugger::continueExecution() {
-    if(stepOverBreakpoint()) {
-        ptrace(PTRACE_CONT, pid_, nullptr, nullptr);
-        waitForSignal();
-    }
-    else {
-        std::cout << "\nStep over Breakpoint failed! Cannot Continue Execution.";
-    }
+    stepOverBreakpoint();
+    ptrace(PTRACE_CONT, pid_, nullptr, nullptr);
+    waitForSignal();
+
 }
 
-bool Debugger::singleStep() {
+void Debugger::singleStep() {
     errno = 0;
     //std::cout << "SingleStepping!\n";
     long res = ptrace(PTRACE_SINGLESTEP, pid_, nullptr, nullptr);
     
     if(errno && res == -1) {
-        std::cerr << "ptrace error: " << strerror(errno) << ".\n Single Step Failed!\n";
-        return false;
+        throw std::runtime_error("ptrace error: " + std::string(strerror(errno)) + 
+            "..\n Single Step Failed!\n");
     }
     waitForSignal();
     //std::cout << "Finished SingleStepping!\n";
 
-    return true;
+    //return true;
 }
-bool Debugger::stepOverBreakpoint() {
+void Debugger::stepOverBreakpoint() {
     uint64_t addr = getPC() - 1;
     auto it = addrToBp_.find(static_cast<intptr_t>(addr));
-    bool ret = true;
 
     if(it != addrToBp_.end()) {
         if(it->second.isEnabled()) {
-            ret = setPC(addr);
             it->second.disable();
-            ret = ret && singleStep();
+            singleStep();
             it->second.enable();
         }
         
     }
-    return ret;
+    //return ret;
+}
+
+dwarf::die Debugger::getFunctionFromPC(uint64_t pc) {
+    for(const auto& cu : dwarf_.compilation_units()) {
+        if(dwarf::die_pc_range(cu.root()).contains(pc)) {
+            for(auto die : cu.root()) {
+                if(die.tag == dwarf::DW_TAG::subprogram && dwarf::die_pc_range(die).contains(pc)) {
+                    return die;
+                }
+            }
+        }
+    }
+    throw std::out_of_range("Function not found for pc. Something is definitely wrong!\n");
+}
+
+dwarf::line_table::iterator Debugger::getLineEntryFromPC(uint64_t pc) {
+    for(const auto& cu : dwarf_.compilation_units()) {
+        if(dwarf::die_pc_range(cu.root()).contains(pc)) {
+            const auto lineTable = cu.get_line_table();
+            const auto lineEntryItr = lineTable.find_address(pc);
+            if(lineEntryItr != lineTable.end()) return lineEntryItr;
+            else throw std::out_of_range("Line Entry not found in table!\n");
+        }
+    }
+    throw std::out_of_range("PC not found in any line table!\n");
+}
+
+void Debugger::printSource(const std::string fileName, unsigned line, unsigned numOfContextLines) {
+    unsigned start = (line > numOfContextLines) ? line - numOfContextLines : 1;
+    unsigned end = line + numOfContextLines + 1 + ((line - start >= numOfContextLines) ? (0) :
+        (numOfContextLines - start - line));    //could optimize formula
+    
+    std::fstream file;
+    file.open(fileName, std::ios::in);
+    
+    std::string buffer = "";
+    
+    unsigned index = 0;
+
+    for(; index < start; index++) {
+        std::getline(file, buffer, '\n');
+    }
+    while(getline(file, buffer, '\n') && index < end) {
+        std::cout << (index == line ? "> " : " ") << index << " " << buffer << "\n";
+        ++index;
+    }
+    std::cout << std::endl; //flush buffer and extra newline just in case
 }
 
 void Debugger::waitForSignal() {
@@ -266,6 +357,8 @@ void Debugger::waitForSignal() {
 
     if(waitpid(pid_, &wait_status, options) == -1 && errno) {
         std::cerr << "ptrace error: " << strerror(errno) << ".\n WaitPid failed!\n";
+        throw std::runtime_error("ptrace error:" + std::string(strerror(errno)) +
+            ".\n Waitpid failed!\n");
     }
 
     if(WIFEXITED(wait_status)) {
@@ -276,4 +369,52 @@ void Debugger::waitForSignal() {
         std::cout << "\n**Warning! Child process has terminated abnormally! (Thank you for using Peek.)**" << std::endl;
         exit_ = true;
     }
+
+    auto signal = getSignalInfo();
+    switch(signal.si_signo) {
+        case SIGTRAP:
+            handleSIGTRAP(signal);
+            return;
+        case SIGSEGV:
+            std::cerr << "Segmentation Error: " << signal.si_signo << ", Reason: " << signal.si_code << "\n";
+            break;
+        default:
+            std::cerr << "Signal: " << signal.si_signo << ", Reason: " << signal.si_code << "\n";
+            break;
+    }
+
+    auto offset = getPCOffsetAddress();
+    auto lineEntryItr = getLineEntryFromPC(offset);
+    printSource(lineEntryItr->file->path, lineEntryItr->line, context_); 
+}
+
+siginfo_t Debugger::getSignalInfo() {
+    errno = 0;
+    siginfo_t data;
+    if(ptrace(PTRACE_GETSIGINFO, pid_, nullptr, &data) == -1 && errno) {
+        throw std::runtime_error("Ptrace get signal info has failed! " + std::string(strerror(errno)) 
+            + ".\n");
+    }
+    return data;
+}
+
+void Debugger::handleSIGTRAP(siginfo_t signal) {
+    switch(signal.si_code) {
+        case SI_KERNEL:
+        case TRAP_BRKPT: {
+            setPC(getPC() - 1);
+            std::cout << "Hit breakpoint at: " << std::hex << std::uppercase << getPC() << "\n";
+            auto offset = getPCOffsetAddress();
+            auto lineEntryItr = getLineEntryFromPC(offset);
+            printSource(lineEntryItr->file->path, lineEntryItr->line, context_);
+            return;
+        }
+        case 0:
+        case TRAP_TRACE:
+            return;
+    
+        default:
+            std::cout << "Unknown SIGTRAP code: " << signal.si_code << "\n";
+    }
+
 }
