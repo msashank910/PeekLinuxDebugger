@@ -22,7 +22,7 @@ class Debugger {
     bool exit_;
     std::unordered_map<std::intptr_t, Breakpoint> addrToBp_;
 
-    bool handleCommand(std::string args);   //returns if command was processed
+    bool handleCommand(std::string args);   //bool used for spacing
     void setBreakpointAtAddress(std::intptr_t address);
     void dumpBreakpoints();
     void continueExecution();

@@ -16,6 +16,8 @@
 #include <sys/wait.h>
 #include <sys/user.h>
 #include <cstring>
+#include <string_view>
+#include <bit>
 #include <memory>
 #include <stdexcept>
 #include <algorithm>
@@ -77,6 +79,9 @@ void Debugger::initializeLoadAddress() {
     }
     else
         loadAddress_ = 0;
+
+    //std::cout << "DEBUGGING MESSAGE: loadAddress_ = " << std::hex << std::uppercase 
+    //    << loadAddress_ << std::endl;
 }
 
 uint64_t Debugger::offsetLoadAddress(uint64_t addr) { return addr - loadAddress_;}
@@ -102,13 +107,30 @@ bool Debugger::handleCommand(std::string args) {
     auto argv = splitLine(args, ' ');
 
     if(isPrefix(argv[0], "continue_execution")) {
-        std::cout << "Continue Execution...";
+        std::cout << "Continue Execution..." << std::endl;
         continueExecution();
+        //return false;
     }
     else if(isPrefix(argv[0], "breakpoint")) {
         //std::cout << "Placing breakpoint\n";
-        if(argv.size() > 1)     //may change to stoull in future
-            setBreakpointAtAddress(std::stol(strip0x(argv[1]), nullptr, 16)); 
+        if(argv.size() > 1 && !argv[1].empty())   {  //may change to stoull in future 
+            uint64_t num;
+            argv[1] = strip0x(argv[1]);
+            
+            if(argv[1][0] == '*' && validStol(num, std::string_view(argv[1]).substr(1))
+                && num < UINT64_MAX - loadAddress_) {
+                num += loadAddress_;
+                setBreakpointAtAddress(std::bit_cast<intptr_t>(num));
+
+            }
+            else if(validStol(num, argv[1]) && num < UINT64_MAX - loadAddress_) {
+                setBreakpointAtAddress(std::bit_cast<intptr_t>(num));
+
+            }
+            else
+                std::cout << "Invalid address!\n"
+                    << "Pass a valid relative address (*0x1234) or a valid absolute address (0xFFFFFFFF).";
+        }
         else
             std::cout << "Please specify address!";
     }
@@ -200,11 +222,11 @@ bool Debugger::handleCommand(std::string args) {
         std::cout << "Invalid Command!";
     }
 
-    return true;        //Command processed
+    return true;        //Command processed/spacing needed
 
 }
 
-void Debugger::setBreakpointAtAddress(std::intptr_t address) {    
+void Debugger::setBreakpointAtAddress(std::intptr_t address) {
     std::cout << "Setting Breakpoint at: 0x" << std::hex << address << "\n";    //changed to hex
     
     auto [it, inserted] = addrToBp_.emplace(address, Breakpoint(pid_, address));
@@ -289,7 +311,7 @@ void Debugger::singleStep() {
 }
 void Debugger::stepOverBreakpoint() {
     uint64_t addr = getPC() - 1;
-    auto it = addrToBp_.find(static_cast<intptr_t>(addr));
+    auto it = addrToBp_.find(std::bit_cast<intptr_t>(addr));
 
     if(it != addrToBp_.end()) {
         if(it->second.isEnabled()) {
@@ -343,7 +365,7 @@ void Debugger::printSource(const std::string fileName, unsigned line, unsigned n
         std::getline(file, buffer, '\n');
     }
     while(getline(file, buffer, '\n') && index < end) {
-        std::cout << (index == line ? "> " : " ") << index << " " << buffer << "\n";
+        std::cout << std::dec << (index == line ? "> " : " ") << index << " " << buffer << "\n";
         ++index;
     }
     std::cout << std::endl; //flush buffer and extra newline just in case
@@ -364,10 +386,12 @@ void Debugger::waitForSignal() {
     if(WIFEXITED(wait_status)) {
         std::cout << "\n**Child process has complete normally. Thank you for using Peek!**" << std::endl;
         exit_ = true;
+        return;
     }
     else if(WIFSIGNALED(wait_status)) {
         std::cout << "\n**Warning! Child process has terminated abnormally! (Thank you for using Peek.)**" << std::endl;
         exit_ = true;
+        return;
     }
 
     auto signal = getSignalInfo();

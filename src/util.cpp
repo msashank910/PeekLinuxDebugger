@@ -4,6 +4,8 @@
 #include <vector>
 #include <iostream>
 #include <sstream>
+#include <string_view>
+#include <charconv>
 
 //Helpers 
 
@@ -27,5 +29,12 @@ namespace util {
         }
     
         return args;
+    }
+
+
+    bool validStol(uint64_t& num, std::string_view addr) {
+        return (std::from_chars(addr.data(), addr.data() + addr.size(), num, 16).ec == std::errc{});
+        //auto err = std::from_chars(addr.data(), addr.data() + addr.size(), num, 16);
+        //if(err.ec == std::errc()) return true;
     }
 }
