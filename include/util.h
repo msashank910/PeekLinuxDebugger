@@ -8,7 +8,7 @@
 
 
 namespace util {
-    std::string_view strip0x(const std::string_view& s);  //change function later
+    std::string_view stripAddrPrefix(const std::string_view& s);  //change function later
     
     inline bool isPrefix(const std::string& a, const std::string& b) {
         return std::equal(a.begin(), a.end(), b.begin());

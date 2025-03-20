@@ -11,11 +11,13 @@
 //Helpers 
 
 namespace util {
-    std::string_view strip0x(const std::string_view& s) {          //maybe change later
-        if(!s.empty() && s.length() > 2 && s[0] == '0' && s[1] == 'x') {
-            return s.substr(2);
+    std::string_view stripAddrPrefix(const std::string_view& s) {          
+        auto res = (!s.empty() && s[0] == '*' ? s.substr(1) : s);   //removes * for relative addresses
+
+        if(res.length() > 2 && res[0] == '0' && (res[1] == 'x' || res[1] == 'X')) { //strips 0x or 0X
+            return res.substr(2);
         }
-        return s;
+        return res;
     }
     
     //isPrefix is declined as inline in util.h

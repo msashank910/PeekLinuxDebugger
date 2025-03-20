@@ -40,6 +40,7 @@ class Debugger {
     void setContext(unsigned context);
     void initializeLoadAddress();
     uint64_t offsetLoadAddress(uint64_t addr);
+    uint64_t addLoadAddress(uint64_t addr);
     uint64_t getPCOffsetAddress();
 
     void readMemory(const uint64_t addr, uint64_t &data);

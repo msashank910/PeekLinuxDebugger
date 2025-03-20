@@ -86,6 +86,9 @@ void Debugger::initializeLoadAddress() {
 
 uint64_t Debugger::offsetLoadAddress(uint64_t addr) { return addr - loadAddress_;}
 
+uint64_t Debugger::addLoadAddress(uint64_t addr) { return addr + loadAddress_;}
+
+
 uint64_t Debugger::getPCOffsetAddress() {return offsetLoadAddress(getPC());}
 
 pid_t Debugger::getPID() {return pid_;}
@@ -115,23 +118,22 @@ bool Debugger::handleCommand(std::string args) {
         //std::cout << "Placing breakpoint\n";
         if(argv.size() > 1)   {  //may change to stoull in future 
             uint64_t num;
-            auto stripped0xAddr = strip0x(argv[1]);
-            
-            if(!stripped0xAddr.empty() && stripped0xAddr[0] == '*' 
-                && validStol(num, stripped0xAddr.substr(1))
-                && num < UINT64_MAX - loadAddress_) {
-    
-                num += loadAddress_;
-                setBreakpointAtAddress(std::bit_cast<intptr_t>(num));
+            bool relativeAddr = (!argv[1].empty() && argv[1][0] == '*');
+            auto stringViewAddr = stripAddrPrefix(argv[1]);
 
+            if(relativeAddr) {
+                num = addLoadAddress(num);
             }
-            else if(validStol(num, stripped0xAddr) && num < UINT64_MAX - loadAddress_) {
-                setBreakpointAtAddress(std::bit_cast<intptr_t>(num));
+            
+            if(validStol(num, stringViewAddr) && num < UINT64_MAX - loadAddress_) {
+                std::cout << "Setting Breakpoint at: 0x" << std::hex << num
+                    << (relativeAddr ? " (0x" + std::string(stringViewAddr) + ")\n" : "\n");
 
+                setBreakpointAtAddress(std::bit_cast<intptr_t>(num));
             }
             else
-                std::cout << "Invalid address!\n"
-                    << "Pass a valid relative address (*0x1234) or a valid absolute address (0xFFFFFFFF).";
+                std::cout << "Invalid address!\nPass a valid relative address (*0x1234) "
+                    << "or a valid absolute address (0xFFFFFFFF).";
         }
         else
             std::cout << "Please specify address!";
@@ -163,7 +165,7 @@ bool Debugger::handleCommand(std::string args) {
     else if(argv[0] == "register_write" || argv[0] == "rw") {
         if(argv.size() > 2)  {
             Reg r = getRegFromName(argv[1]);
-            auto stripped0xData = strip0x(argv[2]);
+            auto stringData = stripAddrPrefix(argv[2]);
 
             if(r == Reg::INVALID_REG) {
                 std::cout << "Incorrect register name!";
@@ -172,13 +174,19 @@ bool Debugger::handleCommand(std::string args) {
 
             auto oldVal = getRegisterValue(pid_, r);
             uint64_t data; 
-            if(!validStol(data, stripped0xData)) {
+            if(!validStol(data, stringData)) {
                 std::cout << "Please specify valid data!";
             }
             else {
                 setRegisterValue(pid_, r, data); 
+                auto newReadData = getRegisterValue(pid_, r);
+
                 std::cout << std::hex << std::uppercase 
-                << argv[1] << ": 0x" << oldVal << " --> 0x" << getRegisterValue(pid_, r);
+                    << argv[1] << ": " << oldVal << " --> " << newReadData;
+
+                if(newReadData != data) {
+                    std::cerr << "\n**WARNING: Read register value differs from written value**";
+                }
             }
         } 
         else
@@ -195,16 +203,23 @@ bool Debugger::handleCommand(std::string args) {
     else if(argv[0] == "read_memory" || argv[0] == "rm") {
         if(argv.size() > 1)  {
             uint64_t addr;
-            auto stripped0xaddr = strip0x(argv[1]);
-
-            if(!validStol(addr, stripped0xaddr)) {
+            bool relativeAddr = (!argv[1].empty() && argv[1][0] == '*');
+            auto stringViewAddr = stripAddrPrefix(argv[1]);
+            
+            
+            if(!validStol(addr, stringViewAddr)) {
                 std::cout << "Please specify valid address!";
             }
             else {
                 uint64_t data;
+                if(relativeAddr) {
+                    addr = addLoadAddress(addr);
+                }
+                
                 readMemory(addr, data);
-                std::cout << std::hex << std::uppercase 
-                << "Read to memory at 0x" << addr << "--> " << data;
+                std::cout << std::hex << std::uppercase << "Read from memory at 0x " << addr 
+                    << (relativeAddr ? "(0x" + std::string(stringViewAddr) + ") " : "") 
+                    << "--> " << data;
             }
             
         } 
@@ -212,20 +227,36 @@ bool Debugger::handleCommand(std::string args) {
             std::cout << "Please specify address!";
     }
     else if(argv[0] == "write_memory" || argv[0] == "wm") {
-        if(argv.size() > 1)  {
+        if(argv.size() > 2)  {
             uint64_t addr;
-            auto stripped0xaddr = strip0x(argv[1]);
+            uint64_t data;
+            bool relativeAddr = (!argv[1].empty() && argv[1][0] == '*');
+            auto stringViewAddr = stripAddrPrefix(argv[1]);
+            auto stringData = stripAddrPrefix(argv[2]);
 
-            if(!validStol(addr, stripped0xaddr)) {
-                std::cout << "Please specify valid address!";
+            if(!validStol(addr, stringViewAddr) && !validStol(data, stringData)) {
+                std::cout << "Please specify valid memory address and data!";
+                return true;
             }
             else {
-                uint64_t data;
+                if(relativeAddr) {
+                    addr = addLoadAddress(addr);
+                }
+                
+                uint64_t oldData;
+                readMemory(addr, oldData);
+                uint64_t newReadData;
                 writeMemory(addr, data);
-                std::cout << std::hex << std::uppercase << "Written to memory at 0x" << addr 
-                << "--> " << data;
+                readMemory(addr, newReadData);
+
+                std::cout << std::hex << std::uppercase << "Memory at 0x" << addr
+                    << (relativeAddr ? " (0x" + std::string(stringViewAddr) + ")" : "") 
+                    << ": " << oldData << " --> " << newReadData;
+
+                if(newReadData != data) {
+                    std::cerr << "\n**WARNING: Read memory value differs from written value**";
+                }
             }
-            
         } 
         else
             std::cout << "Please specify address!";
@@ -250,8 +281,6 @@ bool Debugger::handleCommand(std::string args) {
 }
 
 void Debugger::setBreakpointAtAddress(std::intptr_t address) {
-    std::cout << "Setting Breakpoint at: 0x" << std::hex << address << "\n";    //changed to hex
-    
     auto [it, inserted] = addrToBp_.emplace(address, Breakpoint(pid_, address));
     if(inserted) {
         it->second.enable();
@@ -302,7 +331,7 @@ void Debugger::readMemory(const uint64_t addr, uint64_t &data) {  //PEEKDATA, sh
     }
 }
 
-void Debugger::writeMemory(const uint64_t addr, const uint64_t &data) {
+void Debugger::writeMemory(const uint64_t addr, const uint64_t &data) { //POKEDATA, show errors if needed
     errno = 0;
     long res = ptrace(PTRACE_POKEDATA, pid_, addr, data);
 
@@ -460,7 +489,7 @@ void Debugger::handleSIGTRAP(siginfo_t signal) {
         case 0:
             return;
         case TRAP_TRACE:
-            std::cout << "Single-Stepping\n";
+            //std::cout << "Single-Stepping\n";
             return;
     
         default:
