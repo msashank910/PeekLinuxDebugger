@@ -17,7 +17,7 @@ public:
     Breakpoint(pid_t pid, std::intptr_t addr);
 
     bool isEnabled() const;
-    std::uint8_t getData();
+    std::uint8_t getData() const;
 
     bool enable();
     bool disable();

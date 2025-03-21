@@ -35,9 +35,10 @@ namespace util {
     }
 
 
-    bool validStol(uint64_t& num, std::string_view addr) {
+    bool validHexStol(uint64_t& num, std::string_view addr) {
         return (std::from_chars(addr.data(), addr.data() + addr.size(), num, 16).ec == std::errc{});
-        //auto err = std::from_chars(addr.data(), addr.data() + addr.size(), num, 16);
-        //if(err.ec == std::errc()) return true;
+    }
+    bool validDecStol(uint64_t& num, std::string_view dec) {
+        return (std::from_chars(dec.data(), dec.data() + dec.size(), num, 10).ec == std::errc{});
     }
 }

@@ -21,6 +21,7 @@
 #include <memory>
 #include <stdexcept>
 #include <algorithm>
+#include <cmath>
 
 
 using namespace util;
@@ -33,7 +34,7 @@ Debugger::Debugger(pid_t pid, std::string progName) : pid_(pid), progName_(std::
     elf_ = elf::elf(elf::create_mmap_loader(fd));
     dwarf_ = dwarf::dwarf(dwarf::elf::create_loader(elf_));
 
-    context_ = 3;
+    context_ = 2;
 
 }
 
@@ -97,9 +98,9 @@ uint64_t Debugger::getPC() const { return getRegisterValue(pid_, Reg::rip); }
 
 bool Debugger::setPC(uint64_t val) { return setRegisterValue(pid_, Reg::rip, val); }
 
-unsigned Debugger::getContext() const {return context_;}
+uint8_t Debugger::getContext() const {return context_;}
 
-void Debugger::setContext(unsigned context) {context_ = context;}
+void Debugger::setContext(uint8_t context) {context_ = context;}
 
 
 
@@ -121,8 +122,8 @@ bool Debugger::handleCommand(std::string args) {
             bool relativeAddr = (!argv[1].empty() && argv[1][0] == '*');
             auto stringViewAddr = stripAddrPrefix(argv[1]);
             
-            if(validStol(addr, stringViewAddr) && addr < UINT64_MAX - loadAddress_) {
-                //std::cout << "passed validStol in breakpoint\n";
+            if(validHexStol(addr, stringViewAddr) && addr < UINT64_MAX - loadAddress_) {
+                //std::cout << "passed validHexStol in breakpoint\n";
                 if(relativeAddr) {
                     //std::cout << "load address added\n";
                     addr = addLoadAddress(addr);
@@ -147,7 +148,7 @@ bool Debugger::handleCommand(std::string args) {
             bool relativeAddr = (!argv[1].empty() && argv[1][0] == '*');
             auto stringViewAddr = stripAddrPrefix(argv[1]);
             
-            if(validStol(addr, stringViewAddr) && addr < UINT64_MAX - loadAddress_) {
+            if(validHexStol(addr, stringViewAddr) && addr < UINT64_MAX - loadAddress_) {
                 if(relativeAddr) {
                     addr = addLoadAddress(addr);
                 }
@@ -177,7 +178,7 @@ bool Debugger::handleCommand(std::string args) {
             bool relativeAddr = (!argv[1].empty() && argv[1][0] == '*');
             auto stringViewAddr = stripAddrPrefix(argv[1]);
             
-            if(validStol(addr, stringViewAddr) && addr < UINT64_MAX - loadAddress_) {
+            if(validHexStol(addr, stringViewAddr) && addr < UINT64_MAX - loadAddress_) {
                 if(relativeAddr) {
                     addr = addLoadAddress(addr);
                 }
@@ -219,13 +220,12 @@ bool Debugger::handleCommand(std::string args) {
         if(argv.size() > 1)  {
             Reg r = getRegFromName(argv[1]);
 
-            if(r != Reg::INVALID_REG) {
-                std::cout << std::hex << std::uppercase
-                    << argv[1] << ": 0x" << getRegisterValue(pid_, r);
-            }
-            else {
+            if(r == Reg::INVALID_REG) {
                 std::cout << "Incorrect Register Name! (ex: r15)";
+                return true;
             }
+            std::cout << std::hex << std::uppercase
+                << argv[1] << ": 0x" << getRegisterValue(pid_, r);
         } 
         else
             std::cout << "Please specify register!";
@@ -233,7 +233,8 @@ bool Debugger::handleCommand(std::string args) {
     else if(argv[0] == "register_write" || argv[0] == "rw") {
         if(argv.size() > 2)  {
             Reg r = getRegFromName(argv[1]);
-            auto stringData = stripAddrPrefix(argv[2]);
+            bool relativeAddr = (!argv[2].empty() && argv[2][0] == '*');
+            auto stringViewData = stripAddrPrefix(argv[2]);
 
             if(r == Reg::INVALID_REG) {
                 std::cout << "Incorrect register name!";
@@ -242,19 +243,26 @@ bool Debugger::handleCommand(std::string args) {
 
             auto oldVal = getRegisterValue(pid_, r);
             uint64_t data; 
-            if(!validStol(data, stringData)) {
+            if(!validHexStol(data, stringViewData)) {
                 std::cout << "Please specify valid data!";
+                return true;
             }
-            else {
-                setRegisterValue(pid_, r, data); 
-                auto newReadData = getRegisterValue(pid_, r);
-
-                std::cout << std::hex << std::uppercase 
-                    << argv[1] << ": " << oldVal << " --> " << newReadData;
-
-                if(newReadData != data) {
-                    std::cerr << "\n**WARNING: Read register value differs from written value**";
+            if(relativeAddr) {
+                if(data > UINT64_MAX - loadAddress_) {
+                    std::cout << "Too big for a relative address!";
+                    return true;
                 }
+                data = addLoadAddress(data);
+            }
+            setRegisterValue(pid_, r, data); 
+            auto newReadData = getRegisterValue(pid_, r);
+
+            std::cout << std::hex << std::uppercase 
+                << argv[1] << ": " << oldVal << " --> " << newReadData
+                << (relativeAddr ? " (0x" + std::string(stringViewData) + ")" : "");
+
+            if(newReadData != data) {
+                std::cerr << "\n**WARNING: Read register value differs from written value**";
             }
         } 
         else
@@ -270,26 +278,24 @@ bool Debugger::handleCommand(std::string args) {
             bool relativeAddr = (!argv[1].empty() && argv[1][0] == '*');
             auto stringViewAddr = stripAddrPrefix(argv[1]);
             
-            
-            if(!validStol(addr, stringViewAddr)) {
+            if(!validHexStol(addr, stringViewAddr)) {
                 std::cout << "Please specify valid address!";
+                return true;
             }
-            else {
-                uint64_t data;
-                if(relativeAddr) {
-                    if(addr >= UINT64_MAX - loadAddress_) {
-                        std::cout << "Too big for a relative address!";
-                        return true;
-                    }
-                    addr = addLoadAddress(addr);
+            uint64_t data;
+
+            if(relativeAddr) {
+                if(addr > UINT64_MAX - loadAddress_) {
+                    std::cout << "Too big for a relative address!";
+                    return true;
                 }
-                
-                readMemory(addr, data);
-                std::cout << std::hex << std::uppercase << "Read from memory at 0x" << addr 
-                    << (relativeAddr ? " (0x" + std::string(stringViewAddr) + ") " : " ") 
-                    << "--> " << data;
+                addr = addLoadAddress(addr);
             }
             
+            readMemory(addr, data);
+            std::cout << std::hex << std::uppercase << "Read from memory at 0x" << addr 
+                << (relativeAddr ? " (0x" + std::string(stringViewAddr) + ") " : " ") 
+                << "--> " << data;
         } 
         else
             std::cout << "Please specify address!";
@@ -302,42 +308,60 @@ bool Debugger::handleCommand(std::string args) {
             auto stringViewAddr = stripAddrPrefix(argv[1]);
             auto stringData = stripAddrPrefix(argv[2]);
 
-            if(!validStol(addr, stringViewAddr) || !validStol(data, stringData)) {
+            if(!validHexStol(addr, stringViewAddr) || !validHexStol(data, stringData)) {
                 std::cout << "Please specify valid memory address and data!";
                 return true;
             }
-            else {
-                if(relativeAddr) {
-                    if(addr >= UINT64_MAX - loadAddress_) {
-                        std::cout << "Too big for a relative address!";
-                        return true;
-                    }
-
-                    addr = addLoadAddress(addr);
+        
+            if(relativeAddr) {
+                if(addr > UINT64_MAX - loadAddress_) {
+                    std::cout << "Too big for a relative address!";
+                    return true;
                 }
-                
-                std::cout << "stringData: " << stringData
-                    << " data: " << data
-                    << " addr " << addr
-                    << " stringViewAddr " << stringViewAddr << "\n";
-
-                uint64_t oldData;
-                readMemory(addr, oldData);
-                uint64_t newReadData;
-                writeMemory(addr, data);
-                readMemory(addr, newReadData);
-
-                std::cout << std::hex << std::uppercase << "Memory at 0x" << addr
-                    << (relativeAddr ? " (0x" + std::string(stringViewAddr) + ")" : "") 
-                    << ": " << oldData << " --> " << newReadData;
-
-                if(newReadData != data) {
-                    std::cerr << "\n**WARNING: Read memory value differs from written value**";
-                }
+                addr = addLoadAddress(addr);
             }
+            
+            /*
+            std::cout << "stringData: " << stringData
+                << " data: " << data
+                << " addr " << addr
+                << " stringViewAddr " << stringViewAddr << "\n"; 
+
+            */
+
+            uint64_t oldData;
+            readMemory(addr, oldData);
+            uint64_t newReadData;
+            writeMemory(addr, data);
+            readMemory(addr, newReadData);
+
+            std::cout << std::hex << std::uppercase << "Memory at 0x" << addr
+                << (relativeAddr ? " (0x" + std::string(stringViewAddr) + ")" : "") 
+                << ": " << oldData << " --> " << newReadData;
+
+            if(newReadData != data) {
+                std::cerr << "\n**WARNING: Read memory value differs from written value**";
+            }
+            
         } 
         else
             std::cout << "Please specify address!";
+    }
+    else if(argv[0] == "set_context" || argv[0] == "sc") {
+        if(argv.size() > 1 && !argv[1].empty()) {
+            uint64_t newContext;
+            if(!validDecStol(newContext, argv[1]) || newContext > UINT8_MAX || newContext <= 0) {
+                std::cout << "Context should be from 1-255 inclusive";
+                return true;
+            }
+            std::cout << "Context: " << std::dec << static_cast<int>(getContext()) << " --> ";
+            setContext(static_cast<uint8_t>(newContext));
+            std::cout << std::dec << static_cast<int>(getContext());
+        }
+        else {
+            std::cout << "Number of context lines is currently: " 
+                << std::dec << static_cast<int>(getContext());
+        }
     }
     else if(argv[0] == "program_counter" || argv[0] == "pc") {
         auto pc = getPC();
@@ -404,7 +428,7 @@ void Debugger::dumpBreakpoints() const {
     for(auto& it : addrToBp_) {
         auto addr = std::bit_cast<uint64_t>(it.first);
 
-        std::cout << "\n" << std::dec << count << ") 0x" << std::hex << addr 
+        std::cout << "\n" << std::dec << count << ") 0x" << std::hex << std::uppercase << addr 
             << " (0x" << offsetLoadAddress(addr) << ")"
             << " [" << ((it.second.isEnabled()) ? "enabled" : "disabled") << "]";
         ++count;
@@ -495,23 +519,24 @@ dwarf::line_table::iterator Debugger::getLineEntryFromPC(uint64_t pc) const {
     throw std::out_of_range("PC not found in any line table!\n");
 }
 
-void Debugger::printSource(const std::string fileName, unsigned line, unsigned numOfContextLines) const {
+void Debugger::printSource(const std::string fileName, unsigned line, uint8_t numOfContextLines) const {
     unsigned start = (line > numOfContextLines) ? line - numOfContextLines : 1;
-    unsigned end = line + numOfContextLines + 1 + ((line - start >= numOfContextLines) ? (0) :
-        (numOfContextLines - start - line));    //could optimize formula
+    unsigned end = line + numOfContextLines + 1;  //could optimize formula
     
     std::fstream file;
     file.open(fileName, std::ios::in);
     
     std::string buffer = "";
+
+    //calculate uniform spacing based on digits floor(log10(n)) + 1 --> number of digits in n
+    const std::string spacing(static_cast<int>(log10(end)) + 1, ' ');
     
     unsigned index = 1;
-
     for(; index < start; index++) {
         std::getline(file, buffer, '\n');
     }
     while(getline(file, buffer, '\n') && index < end) {
-        std::cout << std::dec << (index == line ? "> " : " ") << index << " " << buffer << "\n";
+        std::cout << std::dec << (index == line ? "> " : "  ") << index << spacing << buffer << "\n";
         ++index;
     }
     std::cout << std::endl; //flush buffer and extra newline just in case

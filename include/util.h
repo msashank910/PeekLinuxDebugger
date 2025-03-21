@@ -14,7 +14,8 @@ namespace util {
         return std::equal(a.begin(), a.end(), b.begin());
     }
 
-    bool validStol(uint64_t& num, std::string_view addr);
+    bool validHexStol(uint64_t& num, std::string_view addr);
+    bool validDecStol(uint64_t& num, std::string_view dec);
     
     std::vector<std::string> splitLine(const std::string &line, char delimiter);
 

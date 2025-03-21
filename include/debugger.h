@@ -14,7 +14,7 @@ class Debugger {
     pid_t pid_;
     std::string progName_;
     uint64_t loadAddress_;
-    unsigned context_;
+    uint8_t context_;
 
     dwarf::dwarf dwarf_;
     elf::elf elf_;
@@ -36,8 +36,8 @@ class Debugger {
     uint64_t getPC() const;
     bool setPC(uint64_t val);
     pid_t getPID() const;
-    unsigned getContext() const;
-    void setContext(unsigned context);
+    uint8_t getContext() const;
+    void setContext(uint8_t context);
     void initializeLoadAddress();
     uint64_t offsetLoadAddress(uint64_t addr) const;
     uint64_t addLoadAddress(uint64_t addr) const;
@@ -49,7 +49,7 @@ class Debugger {
 
     dwarf::die getFunctionFromPC(uint64_t pc) const;
     dwarf::line_table::iterator getLineEntryFromPC(uint64_t pc) const;
-    void printSource(const std::string fileName, const unsigned line, const unsigned numOfContextLines) const;
+    void printSource(const std::string fileName, const unsigned line, const uint8_t numOfContextLines) const;
 
 
 public:

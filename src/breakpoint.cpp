@@ -11,7 +11,7 @@
 //Breakpoint Methods
 Breakpoint::Breakpoint(pid_t pid, std::intptr_t addr) : pid_(pid), addr_(addr), enabled_(false), data_(0) {}
 bool Breakpoint::isEnabled() const {return enabled_;}     
-std::uint8_t Breakpoint::getData() {return data_;}  
+std::uint8_t Breakpoint::getData() const {return data_;}  
 
 bool Breakpoint::enable() { //Optimize?     //fixed wrong parameters for both ptrace calls
     constexpr std::uint64_t int3 = 0xcc;
