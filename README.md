@@ -53,15 +53,6 @@ For example for continue: cont, con, c all work.
 
 🛤 Roadmap
 
-Elves and Dwarves
-
-    Implement support for ELF (Executable and Linkable Format) files and DWARF debugging symbols to enable accurate symbol resolution and debugging information.
-    
-Source and Signals
-
-    Handle and interpret UNIX signals during debugging (e.g., SIGINT, SIGSEGV).
-    Map signals to user-friendly messages and responses.
-
 Source-Level Stepping
 
     Allow line-by-line execution and stepping through source code rather than assembly instructions.
