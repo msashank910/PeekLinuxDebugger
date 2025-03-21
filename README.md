@@ -33,6 +33,10 @@ To run the debugger:
     
     ./build/pld ./<file_path_to_debuggee_program>
 
+Note: Debugee Program must be compiled with the following flags
+
+    -g -gdwarf04
+
 While in the [_pld_] command-line interface, you can interact with the child process via breakpoints, memory manipulation, and register manipulation.
 For a full list of commands, use the help command:
 
@@ -48,15 +52,6 @@ For example for continue: cont, con, c all work.
     Potentially requires sudo for ptrace permissions.
 
 🛤 Roadmap
-
-Elves and Dwarves
-
-    Implement support for ELF (Executable and Linkable Format) files and DWARF debugging symbols to enable accurate symbol resolution and debugging information.
-    
-Source and Signals
-
-    Handle and interpret UNIX signals during debugging (e.g., SIGINT, SIGSEGV).
-    Map signals to user-friendly messages and responses.
 
 Source-Level Stepping
 

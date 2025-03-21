@@ -3,14 +3,17 @@
 #include <sys/ptrace.h>
 #include <sys/types.h>
 #include <cstdint>
+#include <cstring> 
+#include <cerrno>
+#include <iostream>
 
 
 //Breakpoint Methods
 Breakpoint::Breakpoint(pid_t pid, std::intptr_t addr) : pid_(pid), addr_(addr), enabled_(false), data_(0) {}
-bool Breakpoint::isEnabled() {return enabled_;}     
-std::uint8_t Breakpoint::getData() {return data_;}  
+bool Breakpoint::isEnabled() const {return enabled_;}     
+std::uint8_t Breakpoint::getData() const {return data_;}  
 
-void Breakpoint::enable() { //Optimize?     //fixed wrong parameters for both ptrace calls
+bool Breakpoint::enable() { //Optimize?     //fixed wrong parameters for both ptrace calls
     constexpr std::uint64_t int3 = 0xcc;
     auto word = ptrace(PTRACE_PEEKDATA, pid_, addr_, nullptr);
     
@@ -18,14 +21,30 @@ void Breakpoint::enable() { //Optimize?     //fixed wrong parameters for both pt
     data_ = static_cast<std::uint8_t>(word & mask_);
     word = (word & ~mask_) | int3;
 
-    ptrace(PTRACE_POKEDATA, pid_, addr_, word);
+    errno = 0;
+    long res = ptrace(PTRACE_POKEDATA, pid_, addr_, word);
+
+    if(res == -1 && errno) {
+        std::cerr << "Enable Breakpoint has failed: " << strerror(errno) << "\n";
+        return false;
+    }
+
     enabled_ = true;
+    return true;
 }
 
-void Breakpoint::disable() {    //fixed wrong parameters for both ptrace calls
+bool Breakpoint::disable() {    //fixed wrong parameters for both ptrace calls
     auto word = ptrace(PTRACE_PEEKDATA, pid_, addr_, nullptr);  
     word = ((word & ~mask_) | data_);
 
-    ptrace(PTRACE_POKEDATA, pid_, addr_, word);
+    errno = 0;
+    long res = ptrace(PTRACE_POKEDATA, pid_, addr_, word);
+
+    if(res == -1 && errno) {
+        std::cerr << "Disable Breakpoint has failed: " << strerror(errno) << "\n";
+        return false;
+    }
+
     enabled_ = false;
+    return true;
 }
