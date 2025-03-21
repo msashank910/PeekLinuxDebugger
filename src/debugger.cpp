@@ -33,7 +33,7 @@ Debugger::Debugger(pid_t pid, std::string progName) : pid_(pid), progName_(std::
     elf_ = elf::elf(elf::create_mmap_loader(fd));
     dwarf_ = dwarf::dwarf(dwarf::elf::create_loader(elf_));
 
-    context_ = 4;
+    context_ = 3;
 
 }
 
@@ -84,20 +84,20 @@ void Debugger::initializeLoadAddress() {
     //    << loadAddress_ << std::endl;
 }
 
-uint64_t Debugger::offsetLoadAddress(uint64_t addr) { return addr - loadAddress_;}
+uint64_t Debugger::offsetLoadAddress(uint64_t addr) const { return addr - loadAddress_;}
 
-uint64_t Debugger::addLoadAddress(uint64_t addr) { return addr + loadAddress_;}
+uint64_t Debugger::addLoadAddress(uint64_t addr) const { return addr + loadAddress_;}
 
 
-uint64_t Debugger::getPCOffsetAddress() {return offsetLoadAddress(getPC());}
+uint64_t Debugger::getPCOffsetAddress() const {return offsetLoadAddress(getPC());}
 
-pid_t Debugger::getPID() {return pid_;}
+pid_t Debugger::getPID() const {return pid_;}
 
-uint64_t Debugger::getPC() { return getRegisterValue(pid_, Reg::rip); }
+uint64_t Debugger::getPC() const { return getRegisterValue(pid_, Reg::rip); }
 
 bool Debugger::setPC(uint64_t val) { return setRegisterValue(pid_, Reg::rip, val); }
 
-unsigned Debugger::getContext() {return context_;}
+unsigned Debugger::getContext() const {return context_;}
 
 void Debugger::setContext(unsigned context) {context_ = context;}
 
@@ -117,19 +117,21 @@ bool Debugger::handleCommand(std::string args) {
     else if(isPrefix(argv[0], "breakpoint")) {
         //std::cout << "Placing breakpoint\n";
         if(argv.size() > 1)   {  //may change to stoull in future 
-            uint64_t num;
+            uint64_t addr;
             bool relativeAddr = (!argv[1].empty() && argv[1][0] == '*');
             auto stringViewAddr = stripAddrPrefix(argv[1]);
-
-            if(relativeAddr) {
-                num = addLoadAddress(num);
-            }
             
-            if(validStol(num, stringViewAddr) && num < UINT64_MAX - loadAddress_) {
-                std::cout << "Setting Breakpoint at: 0x" << std::hex << num
+            if(validStol(addr, stringViewAddr) && addr < UINT64_MAX - loadAddress_) {
+                //std::cout << "passed validStol in breakpoint\n";
+                if(relativeAddr) {
+                    //std::cout << "load address added\n";
+                    addr = addLoadAddress(addr);
+                }
+
+                std::cout << "Setting Breakpoint at: 0x" << std::hex << addr
                     << (relativeAddr ? " (0x" + std::string(stringViewAddr) + ")\n" : "\n");
 
-                setBreakpointAtAddress(std::bit_cast<intptr_t>(num));
+                setBreakpointAtAddress(std::bit_cast<intptr_t>(addr));
             }
             else
                 std::cout << "Invalid address!\nPass a valid relative address (*0x1234) "
@@ -137,6 +139,72 @@ bool Debugger::handleCommand(std::string args) {
         }
         else
             std::cout << "Please specify address!";
+    }
+    else if(argv[0] == "breakpoint_enable" || argv[0] == "be") {
+        //std::cout << "Enable breakpoints...\n";
+        if(argv.size() > 1)   {  //may change to stoull in future 
+            uint64_t addr;
+            bool relativeAddr = (!argv[1].empty() && argv[1][0] == '*');
+            auto stringViewAddr = stripAddrPrefix(argv[1]);
+            
+            if(validStol(addr, stringViewAddr) && addr < UINT64_MAX - loadAddress_) {
+                if(relativeAddr) {
+                    addr = addLoadAddress(addr);
+                }
+                auto it = addrToBp_.find(std::bit_cast<intptr_t>(addr));
+                
+                if(it != addrToBp_.end()) {
+                    if(!it->second.isEnabled()) it->second.enable();
+
+                    std::cout << "Breakpoint at 0x" << std::hex << it->first 
+                        << " (0x" << offsetLoadAddress(addr) << ") is enabled!";
+                }
+                else {
+                    std::cout << "No breakpoint found at address: 0x" << addr;
+                    return true;
+                }
+            }
+            else
+                std::cout << "Invalid address!\nPass a valid relative address (*0x1234) "
+                    << "or a valid absolute address (0xFFFFFFFF).";
+        }
+        else
+            std::cout << "Please specify address!";
+    }
+    else if(argv[0] == "breakpoint_disable" || argv[0] == "bd") {
+        if(argv.size() > 1)   {  //may change to stoull in future 
+            uint64_t addr;
+            bool relativeAddr = (!argv[1].empty() && argv[1][0] == '*');
+            auto stringViewAddr = stripAddrPrefix(argv[1]);
+            
+            if(validStol(addr, stringViewAddr) && addr < UINT64_MAX - loadAddress_) {
+                if(relativeAddr) {
+                    addr = addLoadAddress(addr);
+                }
+                auto it = addrToBp_.find(std::bit_cast<intptr_t>(addr));
+                
+                if(it != addrToBp_.end()) {
+                    if(it->second.isEnabled()) it->second.disable();
+
+                    std::cout << "Breakpoint at 0x" << std::hex << it->first 
+                        << " (0x" << offsetLoadAddress(addr) << ") is disabled!";
+                }
+                else {
+                    std::cout << "No breakpoint found at address: 0x" << addr;
+                    return true;
+                }
+            }
+            else
+                std::cout << "Invalid address!\nPass a valid relative address (*0x1234) "
+                    << "or a valid absolute address (0xFFFFFFFF).";
+        }
+        else
+            std::cout << "Please specify address!";
+        
+    }
+    else if(argv[0] == "dump_breakpoints" || argv[0] == "db") {
+        std::cout << "Dumping breakpoints...\n";
+        dumpBreakpoints();
     }
     // else if(isPrefix(argv[0], "single_step") || argv[0] == "ss") {
     //     std::cout << "Single Stepping..." << std::endl;
@@ -193,12 +261,8 @@ bool Debugger::handleCommand(std::string args) {
             std::cout << "Please specify register and data!";
     }
     else if(argv[0] == "dump_registers" || argv[0] == "dr") {
-        std::cout << "Dumping registers...";
+        std::cout << "Dumping registers...\n";
         dumpRegisters();
-    }
-    else if(argv[0] == "dump_breakpoints" || argv[0] == "db") {
-        std::cout << "Dumping breakpoints...\n";
-        dumpBreakpoints();
     }
     else if(argv[0] == "read_memory" || argv[0] == "rm") {
         if(argv.size() > 1)  {
@@ -213,12 +277,16 @@ bool Debugger::handleCommand(std::string args) {
             else {
                 uint64_t data;
                 if(relativeAddr) {
+                    if(addr >= UINT64_MAX - loadAddress_) {
+                        std::cout << "Too big for a relative address!";
+                        return true;
+                    }
                     addr = addLoadAddress(addr);
                 }
                 
                 readMemory(addr, data);
-                std::cout << std::hex << std::uppercase << "Read from memory at 0x " << addr 
-                    << (relativeAddr ? "(0x" + std::string(stringViewAddr) + ") " : "") 
+                std::cout << std::hex << std::uppercase << "Read from memory at 0x" << addr 
+                    << (relativeAddr ? " (0x" + std::string(stringViewAddr) + ") " : " ") 
                     << "--> " << data;
             }
             
@@ -234,15 +302,25 @@ bool Debugger::handleCommand(std::string args) {
             auto stringViewAddr = stripAddrPrefix(argv[1]);
             auto stringData = stripAddrPrefix(argv[2]);
 
-            if(!validStol(addr, stringViewAddr) && !validStol(data, stringData)) {
+            if(!validStol(addr, stringViewAddr) || !validStol(data, stringData)) {
                 std::cout << "Please specify valid memory address and data!";
                 return true;
             }
             else {
                 if(relativeAddr) {
+                    if(addr >= UINT64_MAX - loadAddress_) {
+                        std::cout << "Too big for a relative address!";
+                        return true;
+                    }
+
                     addr = addLoadAddress(addr);
                 }
                 
+                std::cout << "stringData: " << stringData
+                    << " data: " << data
+                    << " addr " << addr
+                    << " stringViewAddr " << stringViewAddr << "\n";
+
                 uint64_t oldData;
                 readMemory(addr, oldData);
                 uint64_t newReadData;
@@ -262,8 +340,11 @@ bool Debugger::handleCommand(std::string args) {
             std::cout << "Please specify address!";
     }
     else if(argv[0] == "program_counter" || argv[0] == "pc") {
-        std::cout << std::hex << std::uppercase << "Retrieving program counter...\n" << "Program Counter (rip): " 
-            << getPC();
+        auto pc = getPC();
+        auto pcOffset = offsetLoadAddress(pc);
+    
+        std::cout << std::hex << std::uppercase << "Retrieving program counter...\n" 
+            << "Program Counter (rip): 0x" << pc << " (0x" << pcOffset << ")";
     }
     else if(argv[0] == "help") {
         std::cout << "Welcome to Peek!";
@@ -283,8 +364,13 @@ bool Debugger::handleCommand(std::string args) {
 void Debugger::setBreakpointAtAddress(std::intptr_t address) {
     auto [it, inserted] = addrToBp_.emplace(address, Breakpoint(pid_, address));
     if(inserted) {
-        it->second.enable();
-        std::cout << "Breakpoint successfully set!";
+        if(it->second.enable()) {
+            std::cout << "Breakpoint successfully set!";
+        }
+        else {
+            //std::cerr << "Invalid Memory Address!";
+            addrToBp_.erase(it);
+        }
     }
     else {
         std::cout << "Breakpoint already exists!";  
@@ -293,7 +379,7 @@ void Debugger::setBreakpointAtAddress(std::intptr_t address) {
 }
 
 
-void Debugger::dumpRegisters() {
+void Debugger::dumpRegisters() const {
     /*  Issues:
         - When dumping, registers with 0 in bytes above lsb are omitted
         - dumps in a line, kinda looks ugly
@@ -305,22 +391,29 @@ void Debugger::dumpRegisters() {
         std::cout << "\n" << rd.regName << ": " << std::hex << std::uppercase << "0x" << *regVals;    
         ++regVals;
     }
+    std::cout << std::endl;
+
 }
 
-void Debugger::dumpBreakpoints() {
+void Debugger::dumpBreakpoints() const {
     if(addrToBp_.empty()) {
         std::cout << "No breakpoints set!";
         return;
     }
     int count = 1;
     for(auto& it : addrToBp_) {
-        std::cout << "\n" << count << ") 0x" << it.first << " (" 
-            << ((it.second.isEnabled()) ? "enabled" : "disabled") << ")";
+        auto addr = std::bit_cast<uint64_t>(it.first);
+
+        std::cout << "\n" << std::dec << count << ") 0x" << std::hex << addr 
+            << " (0x" << offsetLoadAddress(addr) << ")"
+            << " [" << ((it.second.isEnabled()) ? "enabled" : "disabled") << "]";
+        ++count;
     }
+    std::cout << std::endl;
 }
 
 //add support for multiple words eventually (check notes/TODO)
-void Debugger::readMemory(const uint64_t addr, uint64_t &data) {  //PEEKDATA, show errors if needed
+void Debugger::readMemory(const uint64_t addr, uint64_t &data) const {  //PEEKDATA, show errors if needed
     errno = 0;
     long res = ptrace(PTRACE_PEEKDATA, pid_, addr, nullptr);
     data = std::bit_cast<uint64_t>(res);
@@ -333,7 +426,7 @@ void Debugger::readMemory(const uint64_t addr, uint64_t &data) {  //PEEKDATA, sh
 
 void Debugger::writeMemory(const uint64_t addr, const uint64_t &data) { //POKEDATA, show errors if needed
     errno = 0;
-    long res = ptrace(PTRACE_POKEDATA, pid_, addr, data);
+    long res = ptrace(PTRACE_POKEDATA, pid_, addr, data);     //const on data since its just a write
 
     if(errno && res == -1) {
         throw std::runtime_error("ptrace error: " + std::string(strerror(errno)) + 
@@ -377,7 +470,7 @@ void Debugger::stepOverBreakpoint() {
     //return ret;
 }
 
-dwarf::die Debugger::getFunctionFromPC(uint64_t pc) {
+dwarf::die Debugger::getFunctionFromPC(uint64_t pc) const {
     for(const auto& cu : dwarf_.compilation_units()) {
         if(dwarf::die_pc_range(cu.root()).contains(pc)) {
             for(auto die : cu.root()) {
@@ -390,7 +483,7 @@ dwarf::die Debugger::getFunctionFromPC(uint64_t pc) {
     throw std::out_of_range("Function not found for pc. Something is definitely wrong!\n");
 }
 
-dwarf::line_table::iterator Debugger::getLineEntryFromPC(uint64_t pc) {
+dwarf::line_table::iterator Debugger::getLineEntryFromPC(uint64_t pc) const {
     for(const auto& cu : dwarf_.compilation_units()) {
         if(dwarf::die_pc_range(cu.root()).contains(pc)) {
             const auto lineTable = cu.get_line_table();
@@ -402,7 +495,7 @@ dwarf::line_table::iterator Debugger::getLineEntryFromPC(uint64_t pc) {
     throw std::out_of_range("PC not found in any line table!\n");
 }
 
-void Debugger::printSource(const std::string fileName, unsigned line, unsigned numOfContextLines) {
+void Debugger::printSource(const std::string fileName, unsigned line, unsigned numOfContextLines) const {
     unsigned start = (line > numOfContextLines) ? line - numOfContextLines : 1;
     unsigned end = line + numOfContextLines + 1 + ((line - start >= numOfContextLines) ? (0) :
         (numOfContextLines - start - line));    //could optimize formula
@@ -412,7 +505,7 @@ void Debugger::printSource(const std::string fileName, unsigned line, unsigned n
     
     std::string buffer = "";
     
-    unsigned index = 0;
+    unsigned index = 1;
 
     for(; index < start; index++) {
         std::getline(file, buffer, '\n');
@@ -465,7 +558,7 @@ void Debugger::waitForSignal() {
     printSource(lineEntryItr->file->path, lineEntryItr->line, context_); 
 }
 
-siginfo_t Debugger::getSignalInfo() {
+siginfo_t Debugger::getSignalInfo() const {
     errno = 0;
     siginfo_t data;
     if(ptrace(PTRACE_GETSIGINFO, pid_, nullptr, &data) == -1 && errno) {
@@ -480,8 +573,10 @@ void Debugger::handleSIGTRAP(siginfo_t signal) {
         case SI_KERNEL:
         case TRAP_BRKPT: {
             setPC(getPC() - 1); //pc is being decremented for stepOverBreakpoint()
-            std::cout << "Hit breakpoint at: " << std::hex << std::uppercase << getPC() << "\n";
             auto offset = getPCOffsetAddress();
+            std::cout << "Hit breakpoint at: " << std::hex << std::uppercase << getPC() 
+                << " (0x" << offset << ")\n";
+        
             auto lineEntryItr = getLineEntryFromPC(offset);
             printSource(lineEntryItr->file->path, lineEntryItr->line, context_);
             return;

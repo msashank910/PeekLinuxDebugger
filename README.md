@@ -33,6 +33,10 @@ To run the debugger:
     
     ./build/pld ./<file_path_to_debuggee_program>
 
+Note: Debugee Program must be compiled with the following flags
+
+    -g -gdwarf04
+
 While in the [_pld_] command-line interface, you can interact with the child process via breakpoints, memory manipulation, and register manipulation.
 For a full list of commands, use the help command:
 

@@ -16,10 +16,10 @@ class Breakpoint {
 public:
     Breakpoint(pid_t pid, std::intptr_t addr);
 
-    bool isEnabled();
+    bool isEnabled() const;
     std::uint8_t getData();
 
-    void enable();
-    void disable();
+    bool enable();
+    bool disable();
 
 };
