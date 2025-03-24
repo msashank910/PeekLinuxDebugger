@@ -1,4 +1,5 @@
 #include "../include/register.h"
+#include "../include/debugger.h"
 
 #include <array>
 #include <string>
@@ -6,7 +7,12 @@
 #include <sys/ptrace.h>
 #include <cstdint>
 #include <algorithm>
+#include <iostream>
 
+using namespace reg;
+
+
+//namespace block for reg
 namespace reg {
     const std::array<regDescriptor, 27> regDescriptorList = {{
         {15, "r15", Reg::r15},
@@ -79,22 +85,6 @@ namespace reg {
 		return *(reinterpret_cast<uint64_t*>(&regVals) + (it - regDescriptorList.begin()));
 	}
 
-	//***BELOW MARKED FOR DELETION***
-
-    // uint64_t getRegisterValue(const pid_t pid, const std::string& regName) {
-	// 	user_regs_struct regVals;
-	// 	ptrace(PTRACE_GETREGS, pid, nullptr, &regVals);
-
-	// 	//auto&& -> reference to const regDescriptor struct
-	// 	auto it =
-	// 		std::find_if(regDescriptorList.begin(), regDescriptorList.end(), [regName](auto&& rd) {
-	// 			return regName == rd.regName;
-	// 		}
-	// 	);
-	// 	return *(reinterpret_cast<uint64_t*>(&regVals) + (it - regDescriptorList.begin()));
-
-	// }
-
     std::string getRegisterName(const Reg r) {
 		return std::find_if(regDescriptorList.begin(), regDescriptorList.end(), [r](auto&& rd){
 			return rd.r == r;
@@ -115,4 +105,47 @@ namespace reg {
 		ptrace(PTRACE_GETREGS, pid, nullptr, &rawRegVals);
 		return reinterpret_cast<uint64_t*>(&rawRegVals);	//dangling pointer if regVals is not a parameter!
 	}
+}
+
+
+
+//Debugger register related methods
+
+void Debugger::dumpRegisters() const {
+    /*  Issues:
+        - When dumping, registers with 0 in bytes above lsb are omitted
+        - dumps in a line, kinda looks ugly
+        - maybe format into a neat table
+    */
+    user_regs_struct rawRegVals;
+    auto regVals = getAllRegisterValues(pid_, rawRegVals);
+    for(auto& rd : regDescriptorList) {     //uppercase vs nouppercase (default)
+        std::cout << "\n" << rd.regName << ": " << std::hex << std::uppercase << "0x" << *regVals;    
+        ++regVals;
+    }
+    std::cout << std::endl;
+
+}
+
+
+//add support for multiple words eventually (check notes/TODO)
+void Debugger::readMemory(const uint64_t addr, uint64_t &data) const {  //PEEKDATA, show errors if needed
+    errno = 0;
+    long res = ptrace(PTRACE_PEEKDATA, pid_, addr, nullptr);
+    data = std::bit_cast<uint64_t>(res);
+    
+    if(errno && res == -1) {
+        throw std::runtime_error("ptrace error: " + std::string(strerror(errno)) + 
+            ".\n Check Memory Address!\n");
+    }
+}
+
+void Debugger::writeMemory(const uint64_t addr, const uint64_t &data) { //POKEDATA, show errors if needed
+    errno = 0;
+    long res = ptrace(PTRACE_POKEDATA, pid_, addr, data);     //const on data since its just a write
+
+    if(errno && res == -1) {
+        throw std::runtime_error("ptrace error: " + std::string(strerror(errno)) + 
+            ".\n Check Memory Address!\n");
+    }
 }

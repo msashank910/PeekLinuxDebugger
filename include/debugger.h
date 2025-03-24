@@ -23,11 +23,20 @@ class Debugger {
     std::unordered_map<std::intptr_t, Breakpoint> addrToBp_;
 
     bool handleCommand(std::string args);   //bool used for spacing
-    void setBreakpointAtAddress(std::intptr_t address);
+    std::pair<std::unordered_map<intptr_t, Breakpoint>::iterator, bool> 
+        setBreakpointAtAddress(std::intptr_t address);
+    void removeBreakpoint(std::unordered_map<intptr_t, Breakpoint>::iterator it);
+    void removeBreakpoint(std::intptr_t address);
     void dumpBreakpoints() const;
     void continueExecution();
+
     void singleStep();
+    void singleStepBreakpointCheck();
+    void stepIn();
+    void stepOut();
+    void stepOver();
     void stepOverBreakpoint();
+
     void waitForSignal();
     void handleSIGTRAP(siginfo_t signal);
     siginfo_t getSignalInfo() const;
@@ -50,6 +59,7 @@ class Debugger {
     dwarf::die getFunctionFromPC(uint64_t pc) const;
     dwarf::line_table::iterator getLineEntryFromPC(uint64_t pc) const;
     void printSource(const std::string fileName, const unsigned line, const uint8_t numOfContextLines) const;
+    void printSourceAtPC() const;
 
 
 public:

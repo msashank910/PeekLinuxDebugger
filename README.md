@@ -78,3 +78,6 @@ Contributions are welcome! Feel free to fork the repository and create pull requ
 📄 License
 
 This project is licensed under the MIT License.
+
+Inspiration drawn from Sy Brand’s mini-debugger tutorial series (2017).  
+No code was reused; this implementation was built from scratch.
