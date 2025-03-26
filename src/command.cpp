@@ -24,7 +24,7 @@ using namespace reg;
 
 void Debugger::run() {
     waitForSignal();
-    initializeLoadAddress();
+    initializeMemoryMapAndLoadAddress();
 
     char* line;
 
@@ -142,18 +142,46 @@ bool Debugger::handleCommand(std::string args) {
     }
     else if(isPrefix(argv[0], "single_step") || argv[0] == "ss") {
         singleStepBreakpointCheck();
+
+        auto pc = getPC();
+        auto pcOffset = offsetLoadAddress(pc);
+    
+        std::cout << std::hex << std::uppercase << "Currently at PC: 0x" << pc
+             << " (0x" << pcOffset << ")";
+
         printSourceAtPC();
     }
     else if(isPrefix(argv[0], "step_in") || argv[0] == "si") {
         stepIn();
+
+        auto pc = getPC();
+        auto pcOffset = offsetLoadAddress(pc);
+    
+        std::cout << std::hex << std::uppercase << "Currently at PC: 0x" << pc
+             << " (0x" << pcOffset << ")";
+        
         printSourceAtPC();
     }
     else if(isPrefix(argv[0], "finish")) {
         stepOut();
+
+        auto pc = getPC();
+        auto pcOffset = offsetLoadAddress(pc);
+    
+        std::cout << std::hex << std::uppercase << "Currently at PC: 0x" << pc
+             << " (0x" << pcOffset << ")";
+
         printSourceAtPC();
     }
     else if(isPrefix(argv[0], "next")) {
         stepOver();
+
+        auto pc = getPC();
+        auto pcOffset = offsetLoadAddress(pc);
+    
+        std::cout << std::hex << std::uppercase << "Currently at PC: 0x" << pc
+             << " (0x" << pcOffset << ")";
+
         printSourceAtPC();
     }
     else if(isPrefix(argv[0], "pid")) {

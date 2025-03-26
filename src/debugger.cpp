@@ -1,7 +1,7 @@
 #include "../include/debugger.h"
 #include "../include/register.h"
 #include "../include/breakpoint.h"
-#include "./command.cpp"
+#include "../include/memorymap.h"
 
 #include <dwarf/dwarf++.hh>
 #include <elf/elf++.hh>
@@ -26,7 +26,8 @@
 using namespace reg;
 
 //Debugger Methods
-Debugger::Debugger(pid_t pid, std::string progName) : pid_(pid), progName_(std::move(progName)), exit_(false) {
+Debugger::Debugger(pid_t pid, std::string progName) : pid_(pid), progName_(std::move(progName)), 
+    exit_(false),  memMap_(){
     auto fd = open(progName_.c_str(), O_RDONLY);
     
     elf_ = elf::elf(elf::create_mmap_loader(fd));
@@ -36,18 +37,22 @@ Debugger::Debugger(pid_t pid, std::string progName) : pid_(pid), progName_(std::
 
 }
 
-void Debugger::initializeLoadAddress() {
+void Debugger::initializeMemoryMapAndLoadAddress() {
     if(elf_.get_hdr().type == elf::et::dyn) {
         
         std::unique_ptr<char, decltype(&free)> ptr(realpath(progName_.c_str(), nullptr), free);
         if(!ptr) {
-            throw std::logic_error("Invalid or nonexistant program name, realpath() failed!");
+            throw std::logic_error("Invalid or nonexistant program name, realpath() failed!\n");
         }
 
         std::string absFilePath = ptr.get();
+        memMap_ = MemoryMap(pid_, absFilePath);
 
         std::ifstream file;
         file.open("/proc/" + std::to_string(getPID()) + "/maps");
+        if(!file.is_open()) {
+            throw std::runtime_error("/proc/pid/maps could not be opened! Check permisions.\n");
+        }
         std::string addr = "";
         std::string possibleFilePath = "";
 
@@ -60,7 +65,8 @@ void Debugger::initializeLoadAddress() {
             possibleFilePath.erase(0, possibleFilePath.find_last_of(" \t") + 1);
         } 
         
-        loadAddress_ = std::stol(addr, nullptr, 16);
+        file.close();
+        loadAddress_ = std::bit_cast<uint64_t>(std::stol(addr, nullptr, 16));
 
     }
     else
@@ -300,8 +306,12 @@ void Debugger::printSource(const std::string fileName, unsigned line, uint8_t nu
     unsigned start = (line > numOfContextLines) ? line - numOfContextLines : 1;
     unsigned end = line + numOfContextLines + 1;  //could optimize formula
     
-    std::fstream file;
+    std::ifstream file;
     file.open(fileName, std::ios::in);
+
+    if(!file.is_open()) {
+        throw std::runtime_error("File could not be opened! Check permisions.\n");
+    }
     
     std::string buffer = "";
 
@@ -316,6 +326,8 @@ void Debugger::printSource(const std::string fileName, unsigned line, uint8_t nu
         std::cout << std::dec << (index == line ? "> " : "  ") << index << spacing << buffer << "\n";
         ++index;
     }
+
+    file.close();
     std::cout << std::endl; //flush buffer and extra newline just in case
 }
 

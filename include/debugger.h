@@ -9,13 +9,15 @@
 #include <elf/elf++.hh>
 
 #include "./breakpoint.h"
+#include "./memorymap.h"
 
 class Debugger {
     pid_t pid_;
     std::string progName_;
     uint64_t loadAddress_;
-    uint8_t context_;
+    MemoryMap memMap_;
 
+    uint8_t context_;
     dwarf::dwarf dwarf_;
     elf::elf elf_;
 
@@ -47,7 +49,7 @@ class Debugger {
     pid_t getPID() const;
     uint8_t getContext() const;
     void setContext(uint8_t context);
-    void initializeLoadAddress();
+    void initializeMemoryMapAndLoadAddress();
     uint64_t offsetLoadAddress(uint64_t addr) const;
     uint64_t addLoadAddress(uint64_t addr) const;
     uint64_t getPCOffsetAddress() const;
