@@ -15,13 +15,13 @@ class Debugger {
     pid_t pid_;
     std::string progName_;
     uint64_t loadAddress_;
-    MemoryMap memMap_;
-
+    bool exit_;
     uint8_t context_;
+
     dwarf::dwarf dwarf_;
     elf::elf elf_;
+    MemoryMap memMap_;
 
-    bool exit_;
     std::unordered_map<std::intptr_t, Breakpoint> addrToBp_;
 
     bool handleCommand(std::string args);   //bool used for spacing

@@ -91,7 +91,7 @@ namespace reg {
 		})->regName;
 	}
 
-    Reg getRegFromName(const std::string& regName) {
+    Reg getRegFromName(const std::string_view regName) {
 		auto it = std::find_if(regDescriptorList.begin(), regDescriptorList.end(), [regName](auto&& rd){
 			return rd.regName == regName;
 		});

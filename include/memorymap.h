@@ -5,6 +5,9 @@
 #include <cstdint>
 #include <vector>
 #include <array>
+#include <optional>
+#include <functional>
+
 
 class MemoryMap {
 
@@ -12,7 +15,7 @@ public:
     MemoryMap();    //default until actually constructed in initializeMemoryMapAndLoadAddress()
     MemoryMap(pid_t pid_, const std::string& pathToExecutable);
     MemoryMap& operator=(const MemoryMap& other);
-    //reload()
+    void reload();
     //parseProcPidMaps()
     
 
@@ -30,7 +33,7 @@ public:
     };
 
     struct PathDescriptor {
-        const std::string type;
+        const std::string name;
         const Path p;
     };
     
@@ -38,23 +41,24 @@ public:
     static const std::array<PathDescriptor, 10> pathDescriptorList;
 
     struct Permissions{
-        const bool read;
-        const bool write;
-        const bool execute;
-        const bool shared;
+        bool read;
+        bool write;
+        bool execute;
+        bool shared;
     };
 
     struct MemoryChunk {
-        const uint64_t addrLow;
-        const uint64_t addrHigh;
-        const Permissions perms;
-        const Path path;
-        const std::string pathname;
-        const std::string pathSuffix;     //can be empty if path type has no suffix
-        
+        uint64_t addrLow;
+        uint64_t addrHigh;
+        Permissions perms;
+        Path path;
+        std::string pathname;
+       // const std::string pathSuffix;     //can be empty if path type has no suffix
+        //suffix/tid may be needed later 
     };
 
-    Path getPathFromStringPathname(std::string_view s) const;
+    Path getPathFromFullPathname(std::string_view s) const;
+    std::string getNameFromPath(Path p) const;
 
     const std::vector<MemoryChunk>& getChunks() const;
     bool canRead(MemoryChunk) const;
@@ -62,12 +66,15 @@ public:
     bool canExecute(MemoryChunk) const;
     bool isShared(MemoryChunk) const;
 
+    void printChunks();
+    std::optional<std::reference_wrapper<const MemoryChunk>> getChunkFromAddr(uint64_t addr) const;
+
+    bool initialized() const;
 
 private:
     //may need to incorporate mutex --> look into lock_guard for RAII
     pid_t pid_;
     std::string exec_;
     std::vector<MemoryChunk> chunks_;
-
-
+    
 };

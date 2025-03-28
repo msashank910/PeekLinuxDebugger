@@ -48,6 +48,10 @@ bool Debugger::handleCommand(std::string args) {
         continueExecution();
         //return false;
     }
+    else if(argv[0] == "debug") {
+        //print memmap
+        memMap_.printChunks();
+    }
     else if(isPrefix(argv[0], "breakpoint")) {
         //std::cout << "Placing breakpoint\n";
         if(argv.size() > 1)   {  //may change to stoull in future 

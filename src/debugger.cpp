@@ -27,14 +27,11 @@ using namespace reg;
 
 //Debugger Methods
 Debugger::Debugger(pid_t pid, std::string progName) : pid_(pid), progName_(std::move(progName)), 
-    exit_(false),  memMap_(){
+    loadAddress_(0), exit_(false), context_(2) {
     auto fd = open(progName_.c_str(), O_RDONLY);
     
     elf_ = elf::elf(elf::create_mmap_loader(fd));
     dwarf_ = dwarf::dwarf(dwarf::elf::create_loader(elf_));
-
-    context_ = 2;
-
 }
 
 void Debugger::initializeMemoryMapAndLoadAddress() {
@@ -69,8 +66,6 @@ void Debugger::initializeMemoryMapAndLoadAddress() {
         loadAddress_ = std::bit_cast<uint64_t>(std::stol(addr, nullptr, 16));
 
     }
-    else
-        loadAddress_ = 0;
 
     //std::cout << "DEBUGGING MESSAGE: loadAddress_ = " << std::hex << std::uppercase 
     //    << loadAddress_ << std::endl;
@@ -348,6 +343,7 @@ void Debugger::waitForSignal() {
         throw std::runtime_error("ptrace error:" + std::string(strerror(errno)) +
             ".\n Waitpid failed!\n");
     }
+    if(memMap_.initialized()) memMap_.reload();
 
     if(WIFEXITED(wait_status)) {
         std::cout << "\n**Child process has complete normally. Thank you for using Peek!**" << std::endl;
@@ -392,8 +388,8 @@ void Debugger::handleSIGTRAP(siginfo_t signal) {
         case TRAP_BRKPT: {
             setPC(getPC() - 1); //pc is being decremented for stepOverBreakpoint()
             auto offset = getPCOffsetAddress();
-            std::cout << "Hit breakpoint at: " << std::hex << std::uppercase << getPC() 
-                << " (0x" << offset << ")\n";
+            // std::cout << "Hit breakpoint at: " << std::hex << std::uppercase << getPC() 
+            //     << " (0x" << offset << ")\n";
         
             auto lineEntryItr = getLineEntryFromPC(offset);
             printSource(lineEntryItr->file->path, lineEntryItr->line, context_);
