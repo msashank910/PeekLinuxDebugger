@@ -27,9 +27,9 @@ void Debugger::run() {
     initializeMemoryMapAndLoadAddress();
 
     char* line;
-
+    std::string prevArgs = "";
     while(!exit_ && (line = linenoise("[__pld__] ")) != nullptr) {
-        if(handleCommand(line)) {std::cout << std::endl;}
+        if(handleCommand(line, prevArgs)) {std::cout << std::endl;}
         linenoiseHistoryAdd(line);  //may need to initialize history
         linenoiseFree(line);
     }
@@ -37,11 +37,18 @@ void Debugger::run() {
 
 //Debugger function: handleCommand()
 
-bool Debugger::handleCommand(std::string args) {
-    if(args.empty()){
+bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
+    if(args.empty() && prevArgs.empty()){
+        //std::cout << "args empty in handlecommand\n";
         return false;
     }
-    auto argv = splitLine(args, ' ');
+
+    std::vector<std::string> argv;
+    if (args.empty()) argv = splitLine(prevArgs, ' ');      //fix cache logic
+    else argv = splitLine(args, ' ');
+    if(argv.empty()) return false;
+    
+    if(!args.empty()) prevArgs = args;
 
     if(isPrefix(argv[0], "continue_execution")) {
         std::cout << "Continue Execution..." << std::endl;
@@ -144,16 +151,16 @@ bool Debugger::handleCommand(std::string args) {
         std::cout << "Dumping breakpoints...\n";
         dumpBreakpoints();
     }
-    else if(isPrefix(argv[0], "single_step") || argv[0] == "ss") {
+    else if(argv[0] == "single_step" || argv[0] == "ss") {
         singleStepBreakpointCheck();
 
         auto pc = getPC();
         auto pcOffset = offsetLoadAddress(pc);
     
         std::cout << std::hex << std::uppercase << "Currently at PC: 0x" << pc
-             << " (0x" << pcOffset << ")";
+             << " (0x" << pcOffset << ")\n";
 
-        printSourceAtPC();
+        //printSourceAtPC();
     }
     else if(isPrefix(argv[0], "step_in") || argv[0] == "si") {
         stepIn();
@@ -162,9 +169,9 @@ bool Debugger::handleCommand(std::string args) {
         auto pcOffset = offsetLoadAddress(pc);
     
         std::cout << std::hex << std::uppercase << "Currently at PC: 0x" << pc
-             << " (0x" << pcOffset << ")";
+             << " (0x" << pcOffset << ")\n";
         
-        printSourceAtPC();
+        //printSourceAtPC();
     }
     else if(isPrefix(argv[0], "finish")) {
         stepOut();
@@ -173,9 +180,9 @@ bool Debugger::handleCommand(std::string args) {
         auto pcOffset = offsetLoadAddress(pc);
     
         std::cout << std::hex << std::uppercase << "Currently at PC: 0x" << pc
-             << " (0x" << pcOffset << ")";
+             << " (0x" << pcOffset << ")\n";
 
-        printSourceAtPC();
+        //printSourceAtPC();
     }
     else if(isPrefix(argv[0], "next")) {
         stepOver();
@@ -184,9 +191,9 @@ bool Debugger::handleCommand(std::string args) {
         auto pcOffset = offsetLoadAddress(pc);
     
         std::cout << std::hex << std::uppercase << "Currently at PC: 0x" << pc
-             << " (0x" << pcOffset << ")";
+             << " (0x" << pcOffset << ")\n";
 
-        printSourceAtPC();
+        //printSourceAtPC();
     }
     else if(isPrefix(argv[0], "pid")) {
         std::cout << "Retrieving child process ID...\n";

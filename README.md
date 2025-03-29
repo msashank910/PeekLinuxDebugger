@@ -42,14 +42,13 @@ For a full list of commands, use the help command:
 
     help
 
-Commands can be executed via their prefixes as well
+Certain commands can be executed via their prefixes as well
 For example for continue: cont, con, c all work.
 
 📋 Current Limitations
 
     No GUI (command-line only).
     Limited command support (in progress).
-    Potentially requires sudo for ptrace permissions.
 
 🛤 Roadmap
 
@@ -68,8 +67,6 @@ Stack Unwinding
 Handling Variables
 
     Inspect and modify local variables and function parameters during execution.
-
-    Documentation and examples
 
 📄 License
 

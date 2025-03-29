@@ -39,6 +39,7 @@ public:
     
     static inline constexpr int pathCount = 10;
     static const std::array<PathDescriptor, 10> pathDescriptorList;
+    static std::string getNameFromPath(Path p);
 
     struct Permissions{
         bool read;
@@ -55,10 +56,9 @@ public:
         std::string pathname;
        // const std::string pathSuffix;     //can be empty if path type has no suffix
         //suffix/tid may be needed later 
+        bool isExec() const;
     };
 
-    Path getPathFromFullPathname(std::string_view s) const;
-    std::string getNameFromPath(Path p) const;
 
     const std::vector<MemoryChunk>& getChunks() const;
     bool canRead(MemoryChunk) const;
@@ -76,5 +76,6 @@ private:
     pid_t pid_;
     std::string exec_;
     std::vector<MemoryChunk> chunks_;
-    
+
+    Path getPathFromFullPathname(std::string_view s) const;
 };

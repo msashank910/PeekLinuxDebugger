@@ -25,10 +25,10 @@ namespace util {
     std::vector<std::string> splitLine(const std::string &line, char delimiter) {    
         std::vector<std::string> args;
         std::stringstream ss(line);
-        std::string temp;
+        std::string temp = "";
     
         while(getline(ss, temp, delimiter)) {
-            args.push_back(temp);
+            if(!temp.empty()) args.push_back(temp);
         }
     
         return args;

@@ -7,6 +7,7 @@
 #include <sys/ptrace.h>
 #include <cstdint>
 #include <algorithm>
+#include <bit>
 #include <iostream>
 
 using namespace reg;
@@ -54,7 +55,7 @@ namespace reg {
 				return r == rd.r;
 			}
 		);
-		*(reinterpret_cast<uint64_t*>(&regVals) + (it - regDescriptorList.begin())) = val;
+		*(std::bit_cast<uint64_t*>(&regVals) + (it - regDescriptorList.begin())) = val;
 
 		return !(ptrace(PTRACE_SETREGS, pid, nullptr, &regVals)) && !errno;
 	}
@@ -69,7 +70,7 @@ namespace reg {
 				return r == rd.r;
 			}
 		);
-		return *(reinterpret_cast<uint64_t*>(&regVals) + (it - regDescriptorList.begin()));
+		return *(std::bit_cast<uint64_t*>(&regVals) + (it - regDescriptorList.begin()));
 	}
 
     uint64_t getRegisterValue(const pid_t pid, const int dwarfNum) {
@@ -82,7 +83,7 @@ namespace reg {
 				return dwarfNum == rd.dwarfNum;
 			}
 		);
-		return *(reinterpret_cast<uint64_t*>(&regVals) + (it - regDescriptorList.begin()));
+		return *(std::bit_cast<uint64_t*>(&regVals) + (it - regDescriptorList.begin()));
 	}
 
     std::string getRegisterName(const Reg r) {
@@ -103,8 +104,15 @@ namespace reg {
 
 	uint64_t* getAllRegisterValues(const pid_t pid, user_regs_struct& rawRegVals) {
 		ptrace(PTRACE_GETREGS, pid, nullptr, &rawRegVals);
-		return reinterpret_cast<uint64_t*>(&rawRegVals);	//dangling pointer if regVals is not a parameter!
+		return std::bit_cast<uint64_t*>(&rawRegVals);	//dangling pointer if regVals is not a parameter!
 	}
+
+	bool setAllRegisterValues(const pid_t pid, uint64_t* rawRegVals) {
+		static_assert(sizeof(user_regs_struct) % sizeof(uint64_t) == 0, "Mismatched size");
+		auto userRegsStruct = *(std::bit_cast<user_regs_struct*>(rawRegVals));
+		return !(ptrace(PTRACE_SETREGS, pid, nullptr, &userRegsStruct)) && !errno;
+	}
+
 }
 
 

@@ -29,6 +29,7 @@ const std::array<MemoryMap::PathDescriptor, 10> MemoryMap::pathDescriptorList {{
 }};
 
 
+bool MemoryMap::MemoryChunk::isExec() const { return path == Path::exec; }
 
 MemoryMap::MemoryMap() : pid_(0), exec_("") {}
 
@@ -89,7 +90,7 @@ const std::vector<MemoryMap::MemoryChunk>& MemoryMap::getChunks() const {
 }
 
 
-MemoryMap::Path MemoryMap::getPathFromFullPathname(std::string_view pathname) const {
+ MemoryMap::Path MemoryMap::getPathFromFullPathname(std::string_view pathname) const {
     if(pathname[0] == '/') {
         auto sharedLibraryCheck = pathname.find(".so");
         if(sharedLibraryCheck != std::string_view::npos) {
@@ -125,7 +126,7 @@ void MemoryMap::reload() {
     chunks_ = newMM.chunks_;
 }
 
-std::string MemoryMap::getNameFromPath(Path p) const {
+std::string MemoryMap::getNameFromPath(Path p) {
     //update, then print function, then debug memory map, then work on step functions
     auto res = std::find_if(pathDescriptorList.begin(), pathDescriptorList.end(), 
         [=] (auto&& pd) {

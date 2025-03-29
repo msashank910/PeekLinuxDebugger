@@ -2,6 +2,8 @@
 
 #include <string>
 #include <unordered_map>
+#include <utility>
+#include <optional>
 #include <sys/types.h>
 #include <signal.h>
 
@@ -24,7 +26,7 @@ class Debugger {
 
     std::unordered_map<std::intptr_t, Breakpoint> addrToBp_;
 
-    bool handleCommand(std::string args);   //bool used for spacing
+    bool handleCommand(const std::string& args, std::string& prevArgs);   //bool used for spacing
     std::pair<std::unordered_map<intptr_t, Breakpoint>::iterator, bool> 
         setBreakpointAtAddress(std::intptr_t address);
     void removeBreakpoint(std::unordered_map<intptr_t, Breakpoint>::iterator it);
@@ -59,7 +61,7 @@ class Debugger {
     void dumpRegisters() const;
 
     dwarf::die getFunctionFromPC(uint64_t pc) const;
-    dwarf::line_table::iterator getLineEntryFromPC(uint64_t pc) const;
+    std::optional<dwarf::line_table::iterator> getLineEntryFromPC(uint64_t pc) const;
     void printSource(const std::string fileName, const unsigned line, const uint8_t numOfContextLines) const;
     void printSourceAtPC() const;
 
