@@ -153,14 +153,15 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
     }
     else if(argv[0] == "single_step" || argv[0] == "ss") {
         singleStepBreakpointCheck();
+        printSourceAtPC();
 
         auto pc = getPC();
         auto pcOffset = offsetLoadAddress(pc);
     
+
         std::cout << std::hex << std::uppercase << "Currently at PC: 0x" << pc
              << " (0x" << pcOffset << ")\n";
 
-        //printSourceAtPC();
     }
     else if(isPrefix(argv[0], "step_in") || argv[0] == "si") {
         stepIn();
@@ -171,7 +172,6 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
         std::cout << std::hex << std::uppercase << "Currently at PC: 0x" << pc
              << " (0x" << pcOffset << ")\n";
         
-        //printSourceAtPC();
     }
     else if(isPrefix(argv[0], "finish")) {
         stepOut();
@@ -182,7 +182,6 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
         std::cout << std::hex << std::uppercase << "Currently at PC: 0x" << pc
              << " (0x" << pcOffset << ")\n";
 
-        //printSourceAtPC();
     }
     else if(isPrefix(argv[0], "next")) {
         stepOver();
@@ -192,8 +191,6 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
     
         std::cout << std::hex << std::uppercase << "Currently at PC: 0x" << pc
              << " (0x" << pcOffset << ")\n";
-
-        //printSourceAtPC();
     }
     else if(isPrefix(argv[0], "pid")) {
         std::cout << "Retrieving child process ID...\n";

@@ -117,7 +117,7 @@ namespace reg {
 
 
 
-//Debugger register related methods
+//Debugger register related member functions
 
 void Debugger::dumpRegisters() const {
     /*  Issues:

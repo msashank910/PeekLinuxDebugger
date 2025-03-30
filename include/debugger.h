@@ -63,7 +63,7 @@ class Debugger {
     dwarf::die getFunctionFromPC(uint64_t pc) const;
     std::optional<dwarf::line_table::iterator> getLineEntryFromPC(uint64_t pc) const;
     void printSource(const std::string fileName, const unsigned line, const uint8_t numOfContextLines) const;
-    void printSourceAtPC() const;
+    void printSourceAtPC(); //can terminate debugger
 
 
 public:
