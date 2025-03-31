@@ -7,6 +7,7 @@ Features (Implemented)
 - Attaching to processes
 - Setting breakpoints
 - Inspecting registers
+- Inspecting memory-mapped spaces
 - Memory manipulation
 - Single-Step
 
