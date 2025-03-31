@@ -39,7 +39,8 @@ void Debugger::initializeMemoryMapAndLoadAddress() {
         
         std::unique_ptr<char, decltype(&free)> ptr(realpath(progName_.c_str(), nullptr), free);
         if(!ptr) {
-            throw std::logic_error("Invalid or nonexistant program name, realpath() failed!\n");
+            throw std::logic_error(std::string("\n[fatal] In Debugger::initializeMemoryMapAndLoadAddress - ") 
+                + " Invalid or nonexistant program name, realpath() failed!\n");
         }
 
         std::string absFilePath = ptr.get();
@@ -48,7 +49,8 @@ void Debugger::initializeMemoryMapAndLoadAddress() {
         std::ifstream file;
         file.open("/proc/" + std::to_string(getPID()) + "/maps");
         if(!file.is_open()) {
-            throw std::runtime_error("/proc/pid/maps could not be opened! Check permisions.\n");
+            throw std::runtime_error(std::string("\n[fatal] In Debugger::initializeMemoryMapAndLoadAddress - ")
+                + "/proc/pid/maps could not be opened! Check permisions.\n");
         }
         std::string addr = "";
         std::string possibleFilePath = "";
@@ -66,9 +68,6 @@ void Debugger::initializeMemoryMapAndLoadAddress() {
         loadAddress_ = std::bit_cast<uint64_t>(std::stol(addr, nullptr, 16));
 
     }
-
-    //std::cout << "DEBUGGING MESSAGE: loadAddress_ = " << std::hex << std::uppercase 
-    //    << loadAddress_ << std::endl;
 }
 
 uint64_t Debugger::offsetLoadAddress(uint64_t addr) const { return addr - loadAddress_;}
@@ -95,7 +94,7 @@ std::pair<std::unordered_map<intptr_t, Breakpoint>::iterator, bool>
 
     if(inserted) {
         if(!it->second.enable()) {
-            std::cerr << "Invalid Memory Address!";
+            std::cerr << "[error] Invalid Memory Address!";
             addrToBp_.erase(it);
             return {addrToBp_.end(), false};
         }
@@ -106,7 +105,7 @@ std::pair<std::unordered_map<intptr_t, Breakpoint>::iterator, bool>
 
 void Debugger::dumpBreakpoints() const {
     if(addrToBp_.empty()) {
-        std::cout << "No breakpoints set!";
+        std::cout << "[error] No breakpoints set!";
         return;
     }
     int count = 1;
@@ -134,9 +133,9 @@ void Debugger::singleStep() {
     errno = 0;
     long res = ptrace(PTRACE_SINGLESTEP, pid_, nullptr, nullptr);
 
-    if(errno && res == -1) {
-        throw std::runtime_error("ptrace error: " + std::string(strerror(errno)) + 
-            "..\n Single Step Failed!\n");
+    if(res == -1) {
+        throw std::runtime_error("\n[fatal] In Debugger::singleStep() - ptrace error: " 
+            + std::string(strerror(errno)) + "..\n[fatal] Single Step Failed!\n");
     }
     waitForSignal();
 }
@@ -150,6 +149,19 @@ void Debugger::singleStepBreakpointCheck() {
         return;
     }
     stepOverBreakpoint();
+}
+
+void Debugger::stepOverBreakpoint() {
+    uint64_t addr = getPC();        //pc points to bp, is altered
+    auto it = addrToBp_.find(std::bit_cast<intptr_t>(addr));
+
+    if(it != addrToBp_.end()) {
+        if(it->second.isEnabled()) {
+            it->second.disable();
+            singleStep();
+            it->second.enable();
+        }
+    }
 }
 
 void Debugger::removeBreakpoint(intptr_t address) {
@@ -172,34 +184,41 @@ void Debugger::removeBreakpoint(std::unordered_map<intptr_t, Breakpoint>::iterat
     }
 }
 
-
-void Debugger::stepOut() {
+bool Debugger::validMemoryRegionShouldStep(std::optional<dwarf::line_table::iterator> itr, bool shouldStep) {
     auto chunk = memMap_.getChunkFromAddr(getPC());
-    auto pcOffset = getPCOffsetAddress();
-    auto itr = getLineEntryFromPC(pcOffset);
-    
+
     if (chunk && (!chunk->get().isExec() || !itr)) {
-        auto c = chunk->get();
-        std::cout << "Memory Space " << MemoryMap::getNameFromPath(c.path) 
+        if(shouldStep) {
+            auto c = chunk->get();
+            std::cout << "[warning] Memory Space " << MemoryMap::getNameFromPath(c.path) 
             << " has no dwarf info, stepping through instructions instead!\n";
-        singleStepBreakpointCheck();
-        return;
+            singleStepBreakpointCheck(); 
+        }
+        return false;
     }
+    else if(exit_ && !chunk) { return false; }
     else if(!chunk) {
-        //if(!chunk) {
-        std::cerr << "Warning: PC " << std::hex << std::uppercase << getPC() 
+        std::cerr << "[info] PC at 0x" << std::hex << std::uppercase << getPC() 
             << " is not in any mapped memory region. Terminating debugger session - "
             << "Thank you for using Peek\n";
         exit_ = true;
-        return;
+        return false; 
     }
+    return true;
+}
+
+void Debugger::stepOut() {
+    auto itr = getLineEntryFromPC(getPCOffsetAddress());
+
+    if(!validMemoryRegionShouldStep(itr, true)) return;
+    
     auto retAddrLocation = getRegisterValue(pid_, Reg::rbp) + 8;
     uint64_t retAddr;
     readMemory(retAddrLocation, retAddr);
     auto[it, inserted] = setBreakpointAtAddress(std::bit_cast<intptr_t>(retAddr));
 
     if(it == addrToBp_.end()) {
-        std::cerr << "Step out failed, invalid return address";
+        std::cerr << "[warning] Step out failed, invalid return address\n";
         return;
     }
     else if(!inserted) {
@@ -215,25 +234,10 @@ void Debugger::stepOut() {
 
 
 void Debugger::stepIn() {       //need to preface with breakpoint on main when you know how to
-    auto chunk = memMap_.getChunkFromAddr(getPC());
     auto pcOffset = getPCOffsetAddress();
     auto itr = getLineEntryFromPC(pcOffset);
 
-    if (chunk && (!chunk->get().isExec() || !itr)) {
-        auto c = chunk->get();
-        std::cout << "Memory Space " << MemoryMap::getNameFromPath(c.path) 
-            << " has no dwarf info, stepping through instructions instead!\n";
-        singleStepBreakpointCheck();
-        return;
-    }
-    else if(!chunk) {
-        //if(!chunk) {
-        std::cerr << "Warning: PC " << std::hex << std::uppercase << getPC() 
-            << " is not in any mapped memory region. Terminating debugger session - "
-            << "Thank you for using Peek\n";
-        exit_ = true;
-        return;
-    }
+    if(!validMemoryRegionShouldStep(itr, true)) return;
     
     unsigned sourceLine = itr.value()->line;
     // user_regs_struct regValStruct;
@@ -245,30 +249,23 @@ void Debugger::stepIn() {       //need to preface with breakpoint on main when y
         pcOffset = getPCOffsetAddress();
     }
 
-    if(!itr) {
-        std::cout << "Stepped into region with no dwarf info, single-stepping instead\n";
-        //singleStep();  
-        //In future --> resolve end of main, check if stepin is in shared library or out of main
-        //If out of main, resort to single stepping, if in shared library:
-            //-> revert registers, then stepOver()  
-    }
-    else printSourceAtPC();
+    // if(!itr) {
+    //     std::cout << "Stepped into region with no dwarf info, single-stepping instead\n";
+    //     //singleStep();  
+    //     //In future --> resolve end of main, check if stepin is in shared library or out of main
+    //     //If out of main, resort to single stepping, if in shared library:
+    //         //-> revert registers, then stepOver()  
+    // }
+    //else printSourceAtPC();
+    // printSourceAtPC();  //handles valid iterator in memory space check
 }
 
 void Debugger::stepOver() {
-
-    auto chunk = memMap_.getChunkFromAddr(getPC());
     auto pcOffset = getPCOffsetAddress();
     auto itr = getLineEntryFromPC(pcOffset);
 
-    if (chunk && (!chunk->get().isExec() || !itr)) {
-        auto c = chunk->get();
-        std::cout << "Memory Space " << MemoryMap::getNameFromPath(c.path) 
-            << " has no dwarf info, stepping through instructions instead!\n";
-        singleStepBreakpointCheck();
-        return;
-    }
-  
+    if(!validMemoryRegionShouldStep(itr, true)) return;
+
     auto func = getFunctionFromPC(pcOffset);
     auto startAddr = addLoadAddress(itr.value()->address);
 
@@ -276,11 +273,11 @@ void Debugger::stepOver() {
     auto high = dwarf::at_high_pc(func);
     auto curr = getLineEntryFromPC(low);
 
-    if(!curr) {
-        std::cout << "Function cannot be resolved in line table. Single stepping...\n";
-        singleStepBreakpointCheck();
-        return;
-    }
+    // if(!curr) {
+    //     std::cout << "Function cannot be resolved in line table. Single stepping...\n";
+    //     singleStepBreakpointCheck();
+    //     return;
+    // }
     
 
     std::vector<std::pair<std::intptr_t, bool>> addrshouldRemove;
@@ -314,24 +311,12 @@ void Debugger::stepOver() {
     continueExecution();
 
     for(auto &[addr, shouldRemove] : addrshouldRemove) {
+        //will crash if it doesn't exist, but should always exist
         if(shouldRemove) removeBreakpoint(addr);
-        else addrToBp_.at(addr).disable();          //will crash if it doesn't exist
-    }
-    
-}
-
-void Debugger::stepOverBreakpoint() {
-    uint64_t addr = getPC();        //pc points to bp, is altered
-    auto it = addrToBp_.find(std::bit_cast<intptr_t>(addr));
-
-    if(it != addrToBp_.end()) {
-        if(it->second.isEnabled()) {
-            it->second.disable();
-            singleStep();
-            it->second.enable();
-        }
+        else addrToBp_.at(addr).disable();          
     }
 }
+
 
 dwarf::die Debugger::getFunctionFromPC(uint64_t pc) const {
     for(const auto& cu : dwarf_.compilation_units()) {
@@ -344,9 +329,8 @@ dwarf::die Debugger::getFunctionFromPC(uint64_t pc) const {
             }
         }
     }
-    throw std::out_of_range("Function not found for pc. Something is definitely wrong!\n");
-    //return std::nullopt;
-
+    throw std::out_of_range(std::string("\n[fatal] In Debugger::getFunctionFromPC() - ") 
+        + "Function not found for pc. Something is definitely wrong!\n");
 }
 
 std::optional<dwarf::line_table::iterator> Debugger::getLineEntryFromPC(uint64_t pc) const {
@@ -370,7 +354,8 @@ void Debugger::printSource(const std::string fileName, unsigned line, uint8_t nu
     file.open(fileName, std::ios::in);
 
     if(!file.is_open()) {
-        throw std::runtime_error("File could not be opened! Check permisions.\n");
+        throw std::runtime_error(std::string("\n[fatal] In Debugger::printSource() - ")
+            + "File could not be opened! Check permisions.\n");
     }
     
     std::string buffer = "";
@@ -382,6 +367,7 @@ void Debugger::printSource(const std::string fileName, unsigned line, uint8_t nu
     for(; index < start; index++) {
         std::getline(file, buffer, '\n');
     }
+    std::cout << "\n";
     while(getline(file, buffer, '\n') && index < end) {
         std::cout << std::dec << (index == line ? "> " : "  ") << index << spacing << buffer << "\n";
         ++index;
@@ -392,26 +378,24 @@ void Debugger::printSource(const std::string fileName, unsigned line, uint8_t nu
 }
 
 void Debugger::printSourceAtPC() {
-    auto chunk = memMap_.getChunkFromAddr(getPC());
-    auto pcOffset = getPCOffsetAddress();
-    auto itr = getLineEntryFromPC(pcOffset);
-
-    if (chunk && (!chunk->get().isExec() || !itr)) {
-        auto c = chunk->get();
-        std::cout << "Memory Space " << MemoryMap::getNameFromPath(c.path) 
-            << " has no dwarf info\n";
-        return;
-    }
-    else if(!chunk) {
-        //if(!chunk) {
-        std::cerr << "Warning: PC " << std::hex << std::uppercase << getPC() 
-            << " is not in any mapped memory region. Terminating debugger session - "
-            << "Thank you for using Peek\n";
-        exit_ = true;
-        return;
-    }
+    auto itr = getLineEntryFromPC(getPCOffsetAddress());
+    if(!validMemoryRegionShouldStep(itr, false)) return;
+    
     auto lineEntryItr = itr.value();
     printSource(lineEntryItr->file->path, lineEntryItr->line, context_);
+}
+
+void Debugger::printMemoryLocationAtPC() const {
+    if(exit_ == true) return;
+
+    auto pc = getPC();
+    auto pcOffset = offsetLoadAddress(pc);
+    auto chunk = memMap_.getChunkFromAddr(pc);
+    
+    std::cout << std::hex << std::uppercase << "[debug] Currently at PC: 0x" 
+        << pc << " (0x" << pcOffset << ") --> "
+        << (chunk ? MemoryMap::getFileNameFromChunk(chunk.value()) : "Unmapped Memory")
+        << "\n";
 }
 
 void Debugger::waitForSignal() {
@@ -420,19 +404,19 @@ void Debugger::waitForSignal() {
     errno = 0;
     //std::cout << "Getting ready to wait!!\n";
 
-    if(waitpid(pid_, &wait_status, options) == -1 && errno) {
-        std::cerr << "ptrace error: " << strerror(errno) << ".\n WaitPid failed!\n";
-        throw std::runtime_error("ptrace error:" + std::string(strerror(errno)) +
-            ".\n Waitpid failed!\n");
+    if(waitpid(pid_, &wait_status, options) == -1) {
+        //std::cerr << "ptrace error: " << strerror(errno) << ".\n WaitPid failed!\n";
+        throw std::runtime_error(std::string("[fatal] In Debugger::waitForSignal() - ")
+            + "ptrace error: " + std::string(strerror(errno)) + ".\n Waitpid failed!\n");
     }
 
     if(WIFEXITED(wait_status)) {
-        std::cout << "\n**Child process has complete normally. Thank you for using Peek!**" << std::endl;
+        std::cout << "\n[info] Child process has complete normally. Thank you for using Peek!" << std::endl;
         exit_ = true;
         return;
     }
     else if(WIFSIGNALED(wait_status)) {
-        std::cout << "\n**Warning! Child process has terminated abnormally! (Thank you for using Peek.)**" << std::endl;
+        std::cout << "\n[info] Child process has terminated abnormally! (Thank you for using Peek)" << std::endl;
         exit_ = true;
         return;
     }
@@ -445,22 +429,22 @@ void Debugger::waitForSignal() {
             handleSIGTRAP(signal);
             return;
         case SIGSEGV:
-            std::cerr << "Segmentation Error: " << signal.si_signo << ", Reason: " << signal.si_code << "\n";
+            std::cerr << "[critical] Segmentation Error: " << signal.si_signo << ", Reason: " << signal.si_code << "\n";
             break;
         default:
-            std::cerr << "Signal: " << signal.si_signo << ", Reason: " << signal.si_code << "\n";
+            std::cerr << "[warning] Signal: " << signal.si_signo << ", Reason: " << signal.si_code << "\n";
             break;
     }
     
-    //printSourceAtPC();
+    printSourceAtPC();
 }
 
 siginfo_t Debugger::getSignalInfo() const {
     errno = 0;
     siginfo_t data;
-    if(ptrace(PTRACE_GETSIGINFO, pid_, nullptr, &data) == -1 && errno) {
-        throw std::runtime_error("Ptrace get signal info has failed! " + std::string(strerror(errno)) 
-            + ".\n");
+    if(ptrace(PTRACE_GETSIGINFO, pid_, nullptr, &data) == -1) {
+        throw std::runtime_error("[fatal] In Debugger::getSignalInfo() - ptrace failure: " 
+            + std::string(strerror(errno)) + ".\n");
     }
     return data;
 }
@@ -470,27 +454,6 @@ void Debugger::handleSIGTRAP(siginfo_t signal) {
         case SI_KERNEL:
         case TRAP_BRKPT: {
             setPC(getPC() - 1); //pc is being decremented for stepOverBreakpoint()
-            auto chunk = memMap_.getChunkFromAddr(getPC());
-            auto pcOffset = getPCOffsetAddress();
-            auto itr = getLineEntryFromPC(pcOffset);
-
-            if (chunk && (!chunk->get().isExec() || !itr)) {
-                auto c = chunk->get();
-                std::cout << "Memory Space " << MemoryMap::getNameFromPath(c.path) 
-                    << " has no dwarf info, no source will be printed!\n";
-                return;
-            }
-            else if(!chunk) {
-                //if(!chunk) {
-                std::cerr << "Warning: PC " << std::hex << std::uppercase << getPC() 
-                    << " is not in any mapped memory region. Terminating debugger session - "
-                    << "Thank you for using Peek\n";
-                exit_ = true;
-                return;
-            }
-
-            auto lineEntryItr = itr.value();
-            printSource(lineEntryItr->file->path, lineEntryItr->line, context_);
             return;
         }
         case 0:
@@ -500,6 +463,6 @@ void Debugger::handleSIGTRAP(siginfo_t signal) {
             return;
     
         default:
-            std::cout << "Unknown SIGTRAP code: " << signal.si_code << "\n";
+            std::cout << "[warning] Unknown SIGTRAP code: " << signal.si_code << "\n";
     }
 }

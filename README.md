@@ -13,7 +13,7 @@ Features (Implemented)
 Technologies Used:
 
     Language: C++
-    Platform: Linux-x86_64 (WSL2 compatible)
+    Platform: Linux-x86-64 (WSL2 compatible)
     Build System: g++ / CMake
 
 📦 Installation
@@ -37,7 +37,7 @@ Note: Debugee Program must be compiled with the following flags
 
     -g -gdwarf04
 
-While in the [_pld_] command-line interface, you can interact with the child process via breakpoints, memory manipulation, and register manipulation.
+While in the [__p|d__] command-line interface, you can interact with the child process via breakpoints, memory manipulation, and register manipulation.
 For a full list of commands, use the help command:
 
     help
@@ -49,12 +49,9 @@ For example for continue: cont, con, c all work.
 
     No GUI (command-line only).
     Limited command support (in progress).
+    Binaries must be compiled in C or C++ on x86-64 Linux
 
 🛤 Roadmap
-
-Source-Level Stepping
-
-    Allow line-by-line execution and stepping through source code rather than assembly instructions.
 
 Source-Level Breakpoints
 

@@ -57,10 +57,11 @@ namespace reg {
 		);
 		*(std::bit_cast<uint64_t*>(&regVals) + (it - regDescriptorList.begin())) = val;
 
-		return !(ptrace(PTRACE_SETREGS, pid, nullptr, &regVals)) && !errno;
+		return (ptrace(PTRACE_SETREGS, pid, nullptr, &regVals) != -1);
 	}
 
     uint64_t getRegisterValue(const pid_t pid, const Reg r) {
+		errno = 0;
 		user_regs_struct regVals;
 		ptrace(PTRACE_GETREGS, pid, nullptr, &regVals);
 
@@ -102,15 +103,18 @@ namespace reg {
 		return it->r;
 	}
 
-	uint64_t* getAllRegisterValues(const pid_t pid, user_regs_struct& rawRegVals) {
-		ptrace(PTRACE_GETREGS, pid, nullptr, &rawRegVals);
-		return std::bit_cast<uint64_t*>(&rawRegVals);	//dangling pointer if regVals is not a parameter!
+	bool getAllRegisterValues(const pid_t pid, user_regs_struct& rawRegVals) {
+		errno = 0;
+		//auto res = ptrace(PTRACE_GETREGS, pid, nullptr, &rawRegVals);
+		return (ptrace(PTRACE_GETREGS, pid, nullptr, &rawRegVals) != -1);
+		//return std::bit_cast<uint64_t*>(&rawRegVals);	//dangling pointer if regVals is not a parameter!
 	}
 
 	bool setAllRegisterValues(const pid_t pid, uint64_t* rawRegVals) {
+		errno = 0;
 		static_assert(sizeof(user_regs_struct) % sizeof(uint64_t) == 0, "Mismatched size");
 		auto userRegsStruct = *(std::bit_cast<user_regs_struct*>(rawRegVals));
-		return !(ptrace(PTRACE_SETREGS, pid, nullptr, &userRegsStruct)) && !errno;
+		return (ptrace(PTRACE_SETREGS, pid, nullptr, &userRegsStruct) != -1);
 	}
 
 }
@@ -119,14 +123,18 @@ namespace reg {
 
 //Debugger register related member functions
 
-void Debugger::dumpRegisters() const {
-    /*  Issues:
+/*  Issues:
         - When dumping, registers with 0 in bytes above lsb are omitted
         - dumps in a line, kinda looks ugly
         - maybe format into a neat table
     */
+void Debugger::dumpRegisters() const {
     user_regs_struct rawRegVals;
-    auto regVals = getAllRegisterValues(pid_, rawRegVals);
+    if(getAllRegisterValues(pid_, rawRegVals)) {
+		std::cerr << "[critical] register values could not be acquired: " << strerror(errno) << "\n";
+		return;
+	}
+	auto regVals = std::bit_cast<uint64_t*>(&rawRegVals);
     for(auto& rd : regDescriptorList) {     //uppercase vs nouppercase (default)
         std::cout << "\n" << rd.regName << ": " << std::hex << std::uppercase << "0x" << *regVals;    
         ++regVals;
@@ -140,20 +148,21 @@ void Debugger::dumpRegisters() const {
 void Debugger::readMemory(const uint64_t addr, uint64_t &data) const {  //PEEKDATA, show errors if needed
     errno = 0;
     long res = ptrace(PTRACE_PEEKDATA, pid_, addr, nullptr);
-    data = std::bit_cast<uint64_t>(res);
     
-    if(errno && res == -1) {
-        throw std::runtime_error("ptrace error: " + std::string(strerror(errno)) + 
-            ".\n Check Memory Address!\n");
+    if(res == -1) {
+        throw std::runtime_error("\n[fatal] In Debugger::readMemory() - ptrace error: " 
+			+ std::string(strerror(errno)) + ".\n[fatal] Check Memory Address!\n");
     }
+
+    data = std::bit_cast<uint64_t>(res);
 }
 
 void Debugger::writeMemory(const uint64_t addr, const uint64_t &data) { //POKEDATA, show errors if needed
     errno = 0;
     long res = ptrace(PTRACE_POKEDATA, pid_, addr, data);     //const on data since its just a write
 
-    if(errno && res == -1) {
-        throw std::runtime_error("ptrace error: " + std::string(strerror(errno)) + 
-            ".\n Check Memory Address!\n");
+    if(res == -1) {
+       throw std::runtime_error("\n[fatal] In Debugger::writeMemory() - ptrace error: " 
+			+ std::string(strerror(errno)) + ".\n[fatal] Check Memory Address!\n");
     }
 }

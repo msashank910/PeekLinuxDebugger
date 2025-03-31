@@ -18,7 +18,7 @@
 int main(int argc, char* argv[]) {
 
     if(argc < 2) {
-        std::cerr << "Must specify Program name\n";
+        std::cerr << "[fatal] Must specify Program name\n";
         return 1;
     }
     
@@ -26,23 +26,24 @@ int main(int argc, char* argv[]) {
     pid_t pid = fork();  // runs a child process concurrently to this process
     
     if(pid == 0) {
-        std::cout << "Entering child process....\n";
+        std::cout << "[debug] Entering child process....\n";
 
         ptrace(PTRACE_TRACEME, 0, nullptr, nullptr);
         personality(ADDR_NO_RANDOMIZE);
         execl(progName, progName, nullptr); //second arg declares name as ./prog
         
-        perror("The debuggee argument is invalid");
+        std::cerr << "[fatal] The debuggee argument is invalid:" << strerror(errno) << "\n";
+        //perror("The debuggee argument is invalid");
         return 1;
         
     }
     else if(pid < 0) {
-        std::cerr << "Invalid Fork\n";
+        std::cerr << "[fatal] Invalid Fork\n";
         return 1;
     }
     
     //run debugger (if program reached here it is a parent)
-    std::cout << "Entering parent debugger process:\n";
+    std::cout << "[debug] Entering parent debugger process....\n";
 
     Debugger debug(pid, progName);
     debug.run();

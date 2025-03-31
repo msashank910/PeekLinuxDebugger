@@ -60,13 +60,15 @@ public:
     };
 
 
+    static bool canRead(MemoryChunk c);
+    static bool canWrite(MemoryChunk c);
+    static bool canExecute(MemoryChunk c);
+    static bool isShared(MemoryChunk c);
+    static std::string getFileNameFromChunk(MemoryChunk c);
+    
     const std::vector<MemoryChunk>& getChunks() const;
-    bool canRead(MemoryChunk) const;
-    bool canWrite(MemoryChunk) const;
-    bool canExecute(MemoryChunk) const;
-    bool isShared(MemoryChunk) const;
-
-    void printChunks();
+    void printChunk(uint64_t pc) const;
+    void dumpChunks() const;
     std::optional<std::reference_wrapper<const MemoryChunk>> getChunkFromAddr(uint64_t addr) const;
 
     bool initialized() const;

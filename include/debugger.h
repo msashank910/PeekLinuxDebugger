@@ -2,6 +2,7 @@
 
 #include <string>
 #include <unordered_map>
+#include <vector>
 #include <utility>
 #include <optional>
 #include <sys/types.h>
@@ -16,6 +17,7 @@
 class Debugger {
     pid_t pid_;
     std::string progName_;
+    //bool verbose;
     uint64_t loadAddress_;
     bool exit_;
     uint8_t context_;
@@ -36,6 +38,7 @@ class Debugger {
 
     void singleStep();
     void singleStepBreakpointCheck();
+    bool validMemoryRegionShouldStep(std::optional<dwarf::line_table::iterator> itr, bool shouldStep);
     void stepIn();
     void stepOut();
     void stepOver();
@@ -64,6 +67,7 @@ class Debugger {
     std::optional<dwarf::line_table::iterator> getLineEntryFromPC(uint64_t pc) const;
     void printSource(const std::string fileName, const unsigned line, const uint8_t numOfContextLines) const;
     void printSourceAtPC(); //can terminate debugger
+    void printMemoryLocationAtPC() const;
 
 
 public:

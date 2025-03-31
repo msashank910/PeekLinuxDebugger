@@ -7,6 +7,7 @@
 #include <vector>
 #include <bit>
 #include <fstream>
+#include <filesystem>
 #include <optional>
 #include <functional>
 
@@ -37,7 +38,8 @@ MemoryMap::MemoryMap(pid_t pid, const std::string& pathToExectuable) : pid_ (pid
     std::ifstream file;
     file.open("/proc/" + std::to_string(pid) + "/maps");
     if(!file.is_open()) {
-        throw std::runtime_error("/proc/pid/maps could not be opened! Check permisions.\n");
+        throw std::runtime_error(std::string("[fatal] In MemoryMap::MemoryMap() - ")
+            + "/proc/pid/maps could not be opened! Check permisions.\n");
     }
     std::string line = "";
     
@@ -55,7 +57,8 @@ MemoryMap::MemoryMap(pid_t pid, const std::string& pathToExectuable) : pid_ (pid
         auto addrHigh = view.substr(dashPos + 1, spacePos - (dashPos + 1));
         if(!validHexStol(low, addrLow) || !validHexStol(high, addrHigh)) {
             file.close();
-            throw std::runtime_error("Address space not resolved correctly\n");
+            throw std::runtime_error(std::string("[fatal] In MemoryMap::MemoryMap() - ")
+                 + "Address space not resolved correctly\n");
         }
 
         view = view.substr(spacePos + 1);
@@ -141,9 +144,60 @@ std::string MemoryMap::getNameFromPath(Path p) {
     return res->name;
 }
 
-void MemoryMap::printChunks() {
-    int i = 1;
+bool MemoryMap::canRead(MemoryChunk c) {return c.perms.read;}
+bool MemoryMap::canWrite(MemoryChunk c) {return c.perms.write;}
+bool MemoryMap::canExecute(MemoryChunk c) {return c.perms.execute;}
+bool MemoryMap::isShared(MemoryChunk c) {return c.perms.shared;}
+
+
+std::string MemoryMap::getFileNameFromChunk(MemoryChunk c) {
+    if(c.path == Path::exec || c.path == Path::so || c.path == Path::mmap) {
+        std::filesystem::path p(c.pathname);
+        //std::cout << "[test] Pathname from filesystem path: " << c.pathname << "\n";
+        //in the future, could directly resolve which cpp file
+        return p.filename().string();
+    }
+    //std::cout << "[test] Pathname from Path Enum Class: " << getNameFromPath(c.path) << "\n";
+    return getNameFromPath(c.path);
+}
+
+void MemoryMap::printChunk(uint64_t pc) const {
+    if(chunks_.empty()) {
+        std::cout << "[warning] No memory chunks have been mapped\n";
+        return;
+    }
+
     std::cout << "\n";
+    for(const auto& c : chunks_) {
+        if(pc < c.addrLow || pc >= c.addrHigh ) continue;
+
+        const auto& perms = c.perms;
+        std::cout << "--------------------------------------------------------\n"
+            << "Current Chunk --> " << c.pathname << "\n" 
+            << "Path Type: " << getNameFromPath(c.path) << "\n"
+            << "Permissions (read-write-execute-shared): " 
+                << (perms.read ? "r" : "-")
+                << (perms.write ? "w" : "-")
+                << (perms.execute ? "x" : "-")
+                << (perms.shared ? "s" : "p")
+                << "\n"
+            << "Lowest Address: " << std::hex << std::uppercase << c.addrLow << "\n"
+            << "Highest Address: " << c.addrHigh << "\n"
+            << "(" << c.addrLow << "-" << c.addrHigh << ")\n"
+            << "--------------------------------------------------------\n";
+        return;
+    }
+    std::cout << "[warning] Address is not in mapped memory\n";
+}
+
+void MemoryMap::dumpChunks() const {
+    if(chunks_.empty()) {
+        std::cout << "[warning] No memory chunks have been mapped\n";
+        return;
+    }
+
+    int i = 1;
+    std::cout << "\n--------------------------------------------------------\n";
     for(const auto& c : chunks_) {
         const auto& perms = c.perms;
         std::cout << std::dec << i << ") " << c.pathname << "\n" 
