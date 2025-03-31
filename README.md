@@ -10,6 +10,7 @@ Features (Implemented)
 - Inspecting memory-mapped spaces
 - Memory manipulation
 - Single-Step
+- Source-level stepping
 
 Technologies Used:
 
