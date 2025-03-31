@@ -1,4 +1,5 @@
 #include "../include/register.h"
+#include "../include/debugger.h"
 
 #include <array>
 #include <string>
@@ -6,7 +7,13 @@
 #include <sys/ptrace.h>
 #include <cstdint>
 #include <algorithm>
+#include <bit>
+#include <iostream>
 
+using namespace reg;
+
+
+//namespace block for reg
 namespace reg {
     const std::array<regDescriptor, 27> regDescriptorList = {{
         {15, "r15", Reg::r15},
@@ -48,12 +55,13 @@ namespace reg {
 				return r == rd.r;
 			}
 		);
-		*(reinterpret_cast<uint64_t*>(&regVals) + (it - regDescriptorList.begin())) = val;
+		*(std::bit_cast<uint64_t*>(&regVals) + (it - regDescriptorList.begin())) = val;
 
-		return !(ptrace(PTRACE_SETREGS, pid, nullptr, &regVals)) && !errno;
+		return (ptrace(PTRACE_SETREGS, pid, nullptr, &regVals) != -1);
 	}
 
     uint64_t getRegisterValue(const pid_t pid, const Reg r) {
+		errno = 0;
 		user_regs_struct regVals;
 		ptrace(PTRACE_GETREGS, pid, nullptr, &regVals);
 
@@ -63,7 +71,7 @@ namespace reg {
 				return r == rd.r;
 			}
 		);
-		return *(reinterpret_cast<uint64_t*>(&regVals) + (it - regDescriptorList.begin()));
+		return *(std::bit_cast<uint64_t*>(&regVals) + (it - regDescriptorList.begin()));
 	}
 
     uint64_t getRegisterValue(const pid_t pid, const int dwarfNum) {
@@ -76,24 +84,8 @@ namespace reg {
 				return dwarfNum == rd.dwarfNum;
 			}
 		);
-		return *(reinterpret_cast<uint64_t*>(&regVals) + (it - regDescriptorList.begin()));
+		return *(std::bit_cast<uint64_t*>(&regVals) + (it - regDescriptorList.begin()));
 	}
-
-	//***BELOW MARKED FOR DELETION***
-
-    // uint64_t getRegisterValue(const pid_t pid, const std::string& regName) {
-	// 	user_regs_struct regVals;
-	// 	ptrace(PTRACE_GETREGS, pid, nullptr, &regVals);
-
-	// 	//auto&& -> reference to const regDescriptor struct
-	// 	auto it =
-	// 		std::find_if(regDescriptorList.begin(), regDescriptorList.end(), [regName](auto&& rd) {
-	// 			return regName == rd.regName;
-	// 		}
-	// 	);
-	// 	return *(reinterpret_cast<uint64_t*>(&regVals) + (it - regDescriptorList.begin()));
-
-	// }
 
     std::string getRegisterName(const Reg r) {
 		return std::find_if(regDescriptorList.begin(), regDescriptorList.end(), [r](auto&& rd){
@@ -101,7 +93,7 @@ namespace reg {
 		})->regName;
 	}
 
-    Reg getRegFromName(const std::string& regName) {
+    Reg getRegFromName(const std::string_view regName) {
 		auto it = std::find_if(regDescriptorList.begin(), regDescriptorList.end(), [regName](auto&& rd){
 			return rd.regName == regName;
 		});
@@ -111,8 +103,66 @@ namespace reg {
 		return it->r;
 	}
 
-	uint64_t* getAllRegisterValues(const pid_t pid, user_regs_struct& rawRegVals) {
-		ptrace(PTRACE_GETREGS, pid, nullptr, &rawRegVals);
-		return reinterpret_cast<uint64_t*>(&rawRegVals);	//dangling pointer if regVals is not a parameter!
+	bool getAllRegisterValues(const pid_t pid, user_regs_struct& rawRegVals) {
+		errno = 0;
+		//auto res = ptrace(PTRACE_GETREGS, pid, nullptr, &rawRegVals);
+		return (ptrace(PTRACE_GETREGS, pid, nullptr, &rawRegVals) != -1);
+		//return std::bit_cast<uint64_t*>(&rawRegVals);	//dangling pointer if regVals is not a parameter!
 	}
+
+	bool setAllRegisterValues(const pid_t pid, uint64_t* rawRegVals) {
+		errno = 0;
+		static_assert(sizeof(user_regs_struct) % sizeof(uint64_t) == 0, "Mismatched size");
+		auto userRegsStruct = *(std::bit_cast<user_regs_struct*>(rawRegVals));
+		return (ptrace(PTRACE_SETREGS, pid, nullptr, &userRegsStruct) != -1);
+	}
+
+}
+
+
+
+//Debugger register related member functions
+
+/*  Issues:
+        - When dumping, registers with 0 in bytes above lsb are omitted
+        - dumps in a line, kinda looks ugly
+        - maybe format into a neat table
+    */
+void Debugger::dumpRegisters() const {
+    user_regs_struct rawRegVals;
+    if(getAllRegisterValues(pid_, rawRegVals)) {
+		std::cerr << "[critical] register values could not be acquired: " << strerror(errno) << "\n";
+		return;
+	}
+	auto regVals = std::bit_cast<uint64_t*>(&rawRegVals);
+    for(auto& rd : regDescriptorList) {     //uppercase vs nouppercase (default)
+        std::cout << "\n" << rd.regName << ": " << std::hex << std::uppercase << "0x" << *regVals;    
+        ++regVals;
+    }
+    std::cout << std::endl;
+
+}
+
+
+//add support for multiple words eventually (check notes/TODO)
+void Debugger::readMemory(const uint64_t addr, uint64_t &data) const {  //PEEKDATA, show errors if needed
+    errno = 0;
+    long res = ptrace(PTRACE_PEEKDATA, pid_, addr, nullptr);
+    
+    if(res == -1) {
+        throw std::runtime_error("\n[fatal] In Debugger::readMemory() - ptrace error: " 
+			+ std::string(strerror(errno)) + ".\n[fatal] Check Memory Address!\n");
+    }
+
+    data = std::bit_cast<uint64_t>(res);
+}
+
+void Debugger::writeMemory(const uint64_t addr, const uint64_t &data) { //POKEDATA, show errors if needed
+    errno = 0;
+    long res = ptrace(PTRACE_POKEDATA, pid_, addr, data);     //const on data since its just a write
+
+    if(res == -1) {
+       throw std::runtime_error("\n[fatal] In Debugger::writeMemory() - ptrace error: " 
+			+ std::string(strerror(errno)) + ".\n[fatal] Check Memory Address!\n");
+    }
 }

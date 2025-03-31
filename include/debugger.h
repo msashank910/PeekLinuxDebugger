@@ -2,6 +2,9 @@
 
 #include <string>
 #include <unordered_map>
+#include <vector>
+#include <utility>
+#include <optional>
 #include <sys/types.h>
 #include <signal.h>
 
@@ -9,25 +12,38 @@
 #include <elf/elf++.hh>
 
 #include "./breakpoint.h"
+#include "./memorymap.h"
 
 class Debugger {
     pid_t pid_;
     std::string progName_;
+    //bool verbose;
     uint64_t loadAddress_;
+    bool exit_;
     uint8_t context_;
 
     dwarf::dwarf dwarf_;
     elf::elf elf_;
+    MemoryMap memMap_;
 
-    bool exit_;
     std::unordered_map<std::intptr_t, Breakpoint> addrToBp_;
 
-    bool handleCommand(std::string args);   //bool used for spacing
-    void setBreakpointAtAddress(std::intptr_t address);
+    bool handleCommand(const std::string& args, std::string& prevArgs);   //bool used for spacing
+    std::pair<std::unordered_map<intptr_t, Breakpoint>::iterator, bool> 
+        setBreakpointAtAddress(std::intptr_t address);
+    void removeBreakpoint(std::unordered_map<intptr_t, Breakpoint>::iterator it);
+    void removeBreakpoint(std::intptr_t address);
     void dumpBreakpoints() const;
     void continueExecution();
+
     void singleStep();
+    void singleStepBreakpointCheck();
+    bool validMemoryRegionShouldStep(std::optional<dwarf::line_table::iterator> itr, bool shouldStep);
+    void stepIn();
+    void stepOut();
+    void stepOver();
     void stepOverBreakpoint();
+
     void waitForSignal();
     void handleSIGTRAP(siginfo_t signal);
     siginfo_t getSignalInfo() const;
@@ -38,7 +54,7 @@ class Debugger {
     pid_t getPID() const;
     uint8_t getContext() const;
     void setContext(uint8_t context);
-    void initializeLoadAddress();
+    void initializeMemoryMapAndLoadAddress();
     uint64_t offsetLoadAddress(uint64_t addr) const;
     uint64_t addLoadAddress(uint64_t addr) const;
     uint64_t getPCOffsetAddress() const;
@@ -48,8 +64,10 @@ class Debugger {
     void dumpRegisters() const;
 
     dwarf::die getFunctionFromPC(uint64_t pc) const;
-    dwarf::line_table::iterator getLineEntryFromPC(uint64_t pc) const;
+    std::optional<dwarf::line_table::iterator> getLineEntryFromPC(uint64_t pc) const;
     void printSource(const std::string fileName, const unsigned line, const uint8_t numOfContextLines) const;
+    void printSourceAtPC(); //can terminate debugger
+    void printMemoryLocationAtPC() const;
 
 
 public:

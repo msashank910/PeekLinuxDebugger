@@ -13,7 +13,7 @@ Features (Implemented)
 Technologies Used:
 
     Language: C++
-    Platform: Linux-x86_64 (WSL2 compatible)
+    Platform: Linux-x86-64 (WSL2 compatible)
     Build System: g++ / CMake
 
 📦 Installation
@@ -37,25 +37,21 @@ Note: Debugee Program must be compiled with the following flags
 
     -g -gdwarf04
 
-While in the [_pld_] command-line interface, you can interact with the child process via breakpoints, memory manipulation, and register manipulation.
+While in the [__p|d__] command-line interface, you can interact with the child process via breakpoints, memory manipulation, and register manipulation.
 For a full list of commands, use the help command:
 
     help
 
-Commands can be executed via their prefixes as well
+Certain commands can be executed via their prefixes as well
 For example for continue: cont, con, c all work.
 
 📋 Current Limitations
 
     No GUI (command-line only).
     Limited command support (in progress).
-    Potentially requires sudo for ptrace permissions.
+    Binaries must be compiled in C or C++ on x86-64 Linux
 
 🛤 Roadmap
-
-Source-Level Stepping
-
-    Allow line-by-line execution and stepping through source code rather than assembly instructions.
 
 Source-Level Breakpoints
 
@@ -69,12 +65,9 @@ Handling Variables
 
     Inspect and modify local variables and function parameters during execution.
 
-    Documentation and examples
-
-🤝 Contributing
-
-Contributions are welcome! Feel free to fork the repository and create pull requests.
-
 📄 License
 
 This project is licensed under the MIT License.
+
+Inspiration drawn from Sy Brand’s mini-debugger tutorial series (2017).  
+No code was reused; this implementation was built from scratch.

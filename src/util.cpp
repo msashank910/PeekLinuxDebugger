@@ -25,20 +25,34 @@ namespace util {
     std::vector<std::string> splitLine(const std::string &line, char delimiter) {    
         std::vector<std::string> args;
         std::stringstream ss(line);
-        std::string temp;
+        std::string temp = "";
     
         while(getline(ss, temp, delimiter)) {
-            args.push_back(temp);
+            if(!temp.empty()) args.push_back(temp);
         }
     
         return args;
     }
 
-
+    //Only converts if string is completely valid and num can hold value
     bool validHexStol(uint64_t& num, std::string_view addr) {
-        return (std::from_chars(addr.data(), addr.data() + addr.size(), num, 16).ec == std::errc{});
+        uint64_t buffer;
+        auto[ptr, ec] = std::from_chars(addr.data(), addr.data() + addr.size(), buffer, 16);
+        if(ptr == addr.end() && ec == std::errc()) {
+            num = buffer;
+            return true;
+        }
+        return false;
     }
+
+    //Only converts if string is completely valid and num can hold value
     bool validDecStol(uint64_t& num, std::string_view dec) {
-        return (std::from_chars(dec.data(), dec.data() + dec.size(), num, 10).ec == std::errc{});
+        uint64_t buffer;
+        auto[ptr, ec] = std::from_chars(dec.data(), dec.data() + dec.size(), buffer, 10);
+        if(ptr == dec.end() && ec == std::errc()) {
+            num = buffer;
+            return true;
+        }
+        return false;
     }
 }

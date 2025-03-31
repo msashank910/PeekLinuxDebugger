@@ -24,8 +24,8 @@ bool Breakpoint::enable() { //Optimize?     //fixed wrong parameters for both pt
     errno = 0;
     long res = ptrace(PTRACE_POKEDATA, pid_, addr_, word);
 
-    if(res == -1 && errno) {
-        std::cerr << "Enable Breakpoint has failed: " << strerror(errno) << "\n";
+    if(res == -1) {
+        std::cerr << "[critical] Enable Breakpoint has failed: " << strerror(errno) << "\n";
         return false;
     }
 
@@ -40,8 +40,8 @@ bool Breakpoint::disable() {    //fixed wrong parameters for both ptrace calls
     errno = 0;
     long res = ptrace(PTRACE_POKEDATA, pid_, addr_, word);
 
-    if(res == -1 && errno) {
-        std::cerr << "Disable Breakpoint has failed: " << strerror(errno) << "\n";
+    if(res == -1) {
+        std::cerr << "[critical] Disable Breakpoint has failed: " << strerror(errno) << "\n";
         return false;
     }
 

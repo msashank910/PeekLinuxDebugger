@@ -10,8 +10,8 @@
 namespace util {
     std::string_view stripAddrPrefix(const std::string_view& s);  //change function later
     
-    inline bool isPrefix(const std::string& a, const std::string& b) {
-        return std::equal(a.begin(), a.end(), b.begin());
+    inline bool isPrefix(const std::string_view prefix, const std::string_view word) {
+        return word.starts_with(prefix);
     }
 
     bool validHexStol(uint64_t& num, std::string_view addr);

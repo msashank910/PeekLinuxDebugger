@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <string_view>
 #include <array>
 #include <cstdint>
 #include <sys/user.h>
@@ -54,11 +55,10 @@ namespace reg {		//register is a reserved keyword
     uint64_t getRegisterValue(const pid_t pid, const Reg r);
     uint64_t getRegisterValue(const pid_t pid, const int dwarfNum);
 
-    //uint64_t getRegisterValue(const pid_t pid, const std::string& regName);	//*** MARKED FOR DELETION***
-
     std::string getRegisterName(const Reg r);
-    Reg getRegFromName(const std::string& regName);
-	uint64_t* getAllRegisterValues(const pid_t pid, user_regs_struct& rawRegVals);
+    Reg getRegFromName(const std::string_view regName);
+	bool getAllRegisterValues(const pid_t pid, user_regs_struct& rawRegVals);
+	bool setAllRegisterValues(const pid_t pid, uint64_t* rawRegVals);
 }
 
   
