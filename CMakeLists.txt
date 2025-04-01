@@ -11,7 +11,7 @@ find_package(PkgConfig REQUIRED)
 FetchContent_Declare(
     linenoise
     GIT_REPOSITORY https://github.com/antirez/linenoise.git
-    GIT_TAG master  # Replace 'main' with a specific commit/tag if needed
+    GIT_TAG master  
 )
 
 FetchContent_Declare(
@@ -44,7 +44,6 @@ pkg_check_modules(LIBELF REQUIRED libelf++)
 # Create the main executable
 file(GLOB SRC_FILES src/*.cpp)
 add_executable(pld ${SRC_FILES})
-#add_executable(pld src/debugger.cpp)
 
 # Include linenoise and libelfin headers
 target_include_directories(pld PRIVATE 
@@ -53,8 +52,6 @@ target_include_directories(pld PRIVATE
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/src 
 )
-# target_include_directories(pld PRIVATE ${linenoise_SOURCE_DIR} ${linenoise_SOURCE_DIR}/include ${libelfin_SOURCE_DIR})
-
 
 # Link libraries using pkg-config
 # Link explicitly to shared libraries (.so)
