@@ -1,4 +1,5 @@
 #include "../include/debugger.h"
+#include "../include/util.h"
 #include "../include/register.h"
 #include "../include/breakpoint.h"
 #include "../include/memorymap.h"
@@ -8,6 +9,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <filesystem>
 #include <sys/ptrace.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -24,6 +26,7 @@
 
 //Use reg namespace
 using namespace reg;
+using util::validDecStol;
 
 //Debugger Member Functions
 Debugger::Debugger(pid_t pid, std::string progName) : pid_(pid), progName_(std::move(progName)), 
@@ -102,6 +105,132 @@ std::pair<std::unordered_map<intptr_t, Breakpoint>::iterator, bool>
 
     return {it, inserted};
 }
+
+
+
+std::pair<std::unordered_map<intptr_t, Breakpoint>::iterator, bool> 
+     Debugger::setBreakpointAtFunctionName(const std::string_view name) {
+    std::vector<std::reference_wrapper<const dwarf::die>> matching;
+    
+    for(const auto& dieRef : functionDies) {
+        const auto& die = dieRef.get();
+        if(die.has(dwarf::DW_AT::name) && dwarf::at_name(die) == name) {
+            matching.push_back(dieRef);
+        }
+    }
+    auto optionalAddr = handleDuplicateFunctionNames(name, matching);
+    if(optionalAddr)
+        return setBreakpointAtAddress(optionalAddr.value());
+    return {addrToBp_.end(), false};
+ 
+    
+}
+
+std::pair<std::unordered_map<intptr_t, Breakpoint>::iterator, bool> 
+     Debugger::setBreakpointAtSourceLine(const std::string_view file, const unsigned line) {
+    std::vector<std::pair<std::string, intptr_t>> filepathAndAddr;
+    for(auto& cu : dwarf_.compilation_units()) {
+        auto& root = cu.root();
+        if(root.has(dwarf::DW_AT::name)) {      //check conflicting filepaths
+            std::filesystem::path diePath(dwarf::at_name(root));  
+            std::filesystem::path filePath(file);
+
+            if(diePath.filename() == filePath.filename()) {
+                auto& lt = cu.get_line_table();
+                for(auto entry : lt) {
+                    if(entry.line == line && entry.is_stmt ) {
+                        auto addr = std::bit_cast<intptr_t>(entry.address);
+                        //return setBreakpointAtAddress(addr);
+                        filepathAndAddr.push_back({dwarf::at_name(root), addr});
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    auto optionalAddr = handleDuplicateFilenames(file, filepathAndAddr);
+    if(optionalAddr)
+        return setBreakpointAtAddress(optionalAddr.value());
+    return {addrToBp_.end(), false};
+}
+
+std::optional<intptr_t>Debugger::handleDuplicateFilenames( const std::string_view filepath,
+    const std::vector<std::pair<std::string, intptr_t>>& fpAndAddr)  {
+   if(fpAndAddr.empty()) return std::nullopt;
+   else if(fpAndAddr.size() == 1) {
+       auto addr = fpAndAddr[0].second;
+       return std::bit_cast<intptr_t>(addLoadAddress(addr));
+   }
+
+   std::cout << "[info] Multiple matches found for '" << filepath << "':\n";
+   int count = 0;
+   for(const auto&[fp, addr] : fpAndAddr) {
+       std::cout << std::dec << "\t[" << count++ << "] " << fp
+           << " at 0x" << std::hex << std::uppercase << addr << "\n";
+   }
+
+   std::cout << "[info] Select one to set a breakpoint (or abort)\n";
+   std::string selection;
+   std::cin >> selection;
+   count = 0;
+   uint64_t index;
+   if(validDecStol(index, selection) && index < fpAndAddr.size()) {
+       auto addr = std::bit_cast<uint64_t>(fpAndAddr[index].second);
+       return std::bit_cast<intptr_t>(addLoadAddress(addr));
+   }
+   return std::nullopt;
+}
+
+std::optional<intptr_t>Debugger::handleDuplicateFunctionNames(
+     const std::string_view name, const std::vector<std::reference_wrapper<const dwarf::die>>& functions)  {
+    if(functions.empty()) return std::nullopt;
+    else if(functions.size() == 1) {
+        auto low = dwarf::at_low_pc(functions[0].get());
+        auto lineEntryItr = getLineEntryFromPC(low);
+        if(!lineEntryItr) {
+            throw std::logic_error("[fatal] In Debugger::setBreakpointAtFunctionName() - "
+                "function definition with low pc does not have valid line entry\n");
+        }
+        auto entry = lineEntryItr.value();
+        auto addr = (++entry)->address;
+        return std::bit_cast<intptr_t>(addLoadAddress(addr));
+    }
+
+    auto funcLocation = [] (dwarf::line_table::iterator& it) {
+        std::filesystem::path path(it->file->path);
+        std::string location = path.filename().string() + ":" + std::to_string(it->line);
+        return location;
+    };
+
+    std::cout << "[info] Multiple matches found for '" << name << "':\n";
+    int count = 0;
+    for(const auto& dieRef : functions) {
+        auto& die = dieRef.get();
+        auto low = dwarf::at_low_pc(die);
+        auto lineEntryItr = getLineEntryFromPC(low);
+        if(!lineEntryItr) {
+            throw std::logic_error("[fatal] In Debugger::setBreakpointAtFunctionName() - "
+                "function definition with low pc does not have valid line entry\n");
+        }
+        auto entry = lineEntryItr.value();
+        std::cout << std::dec << "\t[" << count++ << "] " << dwarf::at_name(die)
+            << " at " << funcLocation(entry) << "\n";
+    }
+
+    std::cout << "[info] Select one to set a breakpoint (or abort)\n";
+    std::string selection;
+    std::cin >> selection;
+    count = 0;
+    uint64_t index;
+    if(validDecStol(index, selection) && index < functions.size()) {
+        auto& die = functions[index].get();
+        auto lineEntry = getLineEntryFromPC(dwarf::at_low_pc(die));
+        auto addr = (++(lineEntry.value()))->address;
+        return std::bit_cast<intptr_t>(addLoadAddress(addr));
+    }
+    return std::nullopt;
+}
+
 
 void Debugger::dumpBreakpoints() const {
     if(addrToBp_.empty()) {
@@ -266,7 +395,7 @@ void Debugger::stepOver() {
 
     if(!validMemoryRegionShouldStep(itr, true)) return;
 
-    auto func = getFunctionFromPC(pcOffset);
+    auto func = getFunctionFromPCOffset(pcOffset);
     auto startAddr = addLoadAddress(itr.value()->address);
 
     auto low = dwarf::at_low_pc(func);
@@ -317,8 +446,28 @@ void Debugger::stepOver() {
     }
 }
 
+/*
+    Dies cannot be stored by references as they are results of temporary objects from the iterators.
+    Storing them as references causes UB in dangling references (reference to pointer from temp itr).
+    Solution --> Store them as copies (even though they are a bit expensive)
+*/
+void Debugger::initializeFunctionDies() {
+    for(const auto& cu : dwarf_.compilation_units()) {
+        for(const auto& die : cu.root()) {
+            if(die.tag == dwarf::DW_TAG::subprogram &&
+                (die.has(dwarf::DW_AT::low_pc) || die.has(dwarf::DW_AT::ranges))) {
+                    functionDies.push_back(std::cref(die));     //stores const reference to die iterator (bad!)
+            }
+        }
+    }
+    if(functionDies.empty())
+        throw std::out_of_range(std::string("\n[fatal] In Debugger::initializeFunctionDies() - ") 
+            + "No functions found. Something is definitely wrong!\n");
+}
 
-dwarf::die Debugger::getFunctionFromPC(uint64_t pc) const {
+
+dwarf::die Debugger::getFunctionFromPCOffset(uint64_t pc) const {
+    /*
     for(const auto& cu : dwarf_.compilation_units()) {
         if(dwarf::die_pc_range(cu.root()).contains(pc)) {
             for(const auto& die : cu.root()) {
@@ -329,7 +478,13 @@ dwarf::die Debugger::getFunctionFromPC(uint64_t pc) const {
             }
         }
     }
-    throw std::out_of_range(std::string("\n[fatal] In Debugger::getFunctionFromPC() - ") 
+    throw std::out_of_range(std::string("\n[fatal] In Debugger::getFunctionFromPCOffset() - ") 
+        + "Function not found for pc. Something is definitely wrong!\n");
+    */
+    for(const auto& dieRef : functionDies) {
+        if(dwarf::die_pc_range(dieRef.get()).contains(pc)) return dieRef.get();
+    }
+    throw std::out_of_range(std::string("\n[fatal] In Debugger::getFunctionFromPCOffset() - ") 
         + "Function not found for pc. Something is definitely wrong!\n");
 }
 

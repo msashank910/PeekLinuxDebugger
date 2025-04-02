@@ -27,15 +27,21 @@ class Debugger {
     MemoryMap memMap_;
 
     std::unordered_map<std::intptr_t, Breakpoint> addrToBp_;
+    std::vector<std::reference_wrapper<const dwarf::die>> functionDies;
 
     bool handleCommand(const std::string& args, std::string& prevArgs);   //bool used for spacing
+    
     std::pair<std::unordered_map<intptr_t, Breakpoint>::iterator, bool> 
         setBreakpointAtAddress(std::intptr_t address);
+    std::pair<std::unordered_map<intptr_t, Breakpoint>::iterator, bool> 
+        setBreakpointAtFunctionName(const std::string_view name);
+    std::pair<std::unordered_map<intptr_t, Breakpoint>::iterator, bool> 
+        setBreakpointAtSourceLine(const std::string_view file, const unsigned line);   
     void removeBreakpoint(std::unordered_map<intptr_t, Breakpoint>::iterator it);
     void removeBreakpoint(std::intptr_t address);
     void dumpBreakpoints() const;
-    void continueExecution();
 
+    void continueExecution();
     void singleStep();
     void singleStepBreakpointCheck();
     bool validMemoryRegionShouldStep(std::optional<dwarf::line_table::iterator> itr, bool shouldStep);
@@ -58,12 +64,18 @@ class Debugger {
     uint64_t offsetLoadAddress(uint64_t addr) const;
     uint64_t addLoadAddress(uint64_t addr) const;
     uint64_t getPCOffsetAddress() const;
+    
 
     void readMemory(const uint64_t addr, uint64_t &data) const;
     void writeMemory(const uint64_t addr, const uint64_t &data);
     void dumpRegisters() const;
 
-    dwarf::die getFunctionFromPC(uint64_t pc) const;
+    void initializeFunctionDies();
+    std::optional<intptr_t> handleDuplicateFunctionNames(const std::string_view, 
+        const std::vector<std::reference_wrapper<const dwarf::die>>& functions);
+    dwarf::die getFunctionFromPCOffset(uint64_t pc) const;
+    std::optional<intptr_t> handleDuplicateFilenames(const std::string_view filepath, 
+        const std::vector<std::pair<std::string, intptr_t>>& fpAndAddr);
     std::optional<dwarf::line_table::iterator> getLineEntryFromPC(uint64_t pc) const;
     void printSource(const std::string fileName, const unsigned line, const uint8_t numOfContextLines) const;
     void printSourceAtPC(); //can terminate debugger

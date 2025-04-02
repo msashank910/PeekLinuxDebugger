@@ -24,6 +24,8 @@ std::string SymbolMap::getNameFromSym(SymbolMap::Sym s) const {
             return "section";
         case Sym::file:
             return "file";
+        default:
+            break;
     }
     return "NULL_SYM";
 }
@@ -40,6 +42,8 @@ SymbolMap::Sym SymbolMap::getSymFromElf(elf::stt s) const {
             return Sym::section;
         case elf::stt::file:
             return Sym::file;
+        default:
+            break;
     }
     return Sym::NULL_SYM;
 }
