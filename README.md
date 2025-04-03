@@ -9,6 +9,8 @@ Features (Implemented)
 - Inspecting registers
 - Memory manipulation
 - Single-Step
+- Source-Level Breakpoints
+- Symbol Resolution
 
 Technologies Used:
 
@@ -52,10 +54,6 @@ For example for continue: cont, con, c all work.
     Binaries must be compiled in C or C++ on x86-64 Linux
 
 🛤 Roadmap
-
-Source-Level Breakpoints
-
-    Enable breakpoints to be set directly at specific lines of code rather than just memory addresses.
 
 Stack Unwinding
 
