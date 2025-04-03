@@ -23,9 +23,17 @@ using namespace reg;
 
 //Debugger function: run()
 void Debugger::run() {
-    waitForSignal();
-    initializeMemoryMapAndLoadAddress();
-    initializeFunctionDies();
+    waitForSignal();                            //debugger has control after ptrace TRACE_ME
+    initializeMemoryMapAndLoadAddress();        //initialize memory map and load addr from /proc/pid/maps
+    initializeFunctionDies();                   //initialize user function DIEs from dwarf info
+    setBreakpointAtFunctionName("main");        //sets a breakpoint on the first valid entry of int main()
+    continueExecution();                        //continues until main() bp is hit
+    auto fp = getRegisterValue(pid_, Reg::rbp); //frame pointer of main is retrieved
+    uint64_t retAddr;
+    readMemory(fp + 8, retAddr);        //return address of main is initialized
+    retAddrFromMain = Breakpoint(pid_, retAddr);
+    //retAddrFromMain.enable();
+    //setBreakpointAtAddress(std::bit_cast<intptr_t>(retAddrFromMain));   //breakpoint is set return address
 
     char* line;
     std::string prevArgs = "";
@@ -54,13 +62,12 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
     }
     else if(argv[0] == "debug") {
         //print memmap
-        // memMap_.dumpChunks();
-        int count = 0;
-        for(auto& die : functionDies) {
-            auto range = dwarf::die_pc_range(die.get());
-            std::cout << std::dec << ++count << std::hex << std::uppercase 
-                << "(" << std::to_string(range.begin()->low) << ")\n";
+        if(argv.size() > 1 && argv[1] == "init") {
+            std::cout << "[debug] Re-initializing...\n";
+            initializeFunctionDies();
+
         }
+        dumpFunctionDies();
     }
     else if(isPrefix(argv[0], "breakpoint")) {
         //std::cout << "Placing breakpoint\n";
@@ -68,7 +75,9 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
             std::cout << "[error] Please specify address, source line, or function name!";
         //reordered because source files may begin with a number
         else if(argv[1].find(':') != std::string::npos) {
-            std::string_view file = argv[1].substr(0, argv[1].find_last_of(':')); 
+            std::string_view file = argv[1]; 
+            file = file.substr(0, file.find_last_of(':')); 
+
             if(file.length() == argv[1].length() - 1) {
                 std::cout << "[error] Specify line number at source file!";
                 return true;
@@ -82,7 +91,7 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
             auto[it, inserted] = setBreakpointAtSourceLine(file, num);
 
             if(it == addrToBp_.end()) {
-                std::cout << "[error] Could not resolve filepath!";
+                std::cout << "[error] Could not resolve filepath or line number!";
                 return true;
             }
             else if(!inserted) {
@@ -91,7 +100,7 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
             }
             auto chunk = memMap_.getChunkFromAddr(std::bit_cast<uint64_t>(it->first));
             auto memSpace = chunk ? MemoryMap::getFileNameFromChunk(chunk.value()) : "Unmapped Memory";
-            std::cout << "[debug] Setting Breakpoint at: " << file << " (" << std::hex << it->first
+            std::cout << "[debug] Setting Breakpoint at: " << argv[1] << " (0x" << std::hex << it->first
                     << ") --> " << memSpace  << "\n";
         }
         else if(argv[1][0] == '*' || ::isdigit(argv[1][0]))   {  //may change to stoull in future 

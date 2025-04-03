@@ -27,7 +27,9 @@ class Debugger {
     MemoryMap memMap_;
 
     std::unordered_map<std::intptr_t, Breakpoint> addrToBp_;
-    std::vector<std::reference_wrapper<const dwarf::die>> functionDies;
+    std::unordered_map<const dwarf::compilation_unit*, std::vector<dwarf::section_offset>> functionDies_;
+
+    Breakpoint retAddrFromMain;
 
     bool handleCommand(const std::string& args, std::string& prevArgs);   //bool used for spacing
     
@@ -71,12 +73,16 @@ class Debugger {
     void dumpRegisters() const;
 
     void initializeFunctionDies();
+    void dumpFunctionDies();
+
     std::optional<intptr_t> handleDuplicateFunctionNames(const std::string_view, 
-        const std::vector<std::reference_wrapper<const dwarf::die>>& functions);
-    dwarf::die getFunctionFromPCOffset(uint64_t pc) const;
+        const std::vector<dwarf::die>& functions);
     std::optional<intptr_t> handleDuplicateFilenames(const std::string_view filepath, 
         const std::vector<std::pair<std::string, intptr_t>>& fpAndAddr);
+
+    dwarf::die getFunctionFromPCOffset(uint64_t pc) const;
     std::optional<dwarf::line_table::iterator> getLineEntryFromPC(uint64_t pc) const;
+
     void printSource(const std::string fileName, const unsigned line, const uint8_t numOfContextLines) const;
     void printSourceAtPC(); //can terminate debugger
     void printMemoryLocationAtPC() const;

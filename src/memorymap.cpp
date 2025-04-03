@@ -78,11 +78,11 @@ MemoryMap::MemoryMap(pid_t pid, const std::string& pathToExectuable) : pid_ (pid
 
 }
 
-MemoryMap& MemoryMap::operator=(const MemoryMap& other) {
+MemoryMap& MemoryMap::operator=(MemoryMap&& other) {
     if(this != &other) {
         this->pid_ = other.pid_;
-        this->exec_ = other.exec_;
-        this->chunks_ = other.chunks_;
+        this->exec_ = std::move(other.exec_);
+        this->chunks_ = std::move(other.chunks_);
     }
     return *this;
 }
@@ -125,8 +125,7 @@ const std::vector<MemoryMap::MemoryChunk>& MemoryMap::getChunks() const {
 
 void MemoryMap::reload() {
     MemoryMap newMM(pid_, exec_);
-    
-    chunks_ = newMM.chunks_;
+    chunks_ = std::move(newMM.chunks_);
 }
 
 std::string MemoryMap::getNameFromPath(Path p) {

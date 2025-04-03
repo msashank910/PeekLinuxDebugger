@@ -9,7 +9,19 @@
 
 
 //Breakpoint Methods
+Breakpoint::Breakpoint() : pid_(0), addr_(0), enabled_(false), data_(0) {}
 Breakpoint::Breakpoint(pid_t pid, std::intptr_t addr) : pid_(pid), addr_(addr), enabled_(false), data_(0) {}
+
+Breakpoint& Breakpoint::operator=(Breakpoint&& bp) {
+    if(this != &bp) {
+        this->pid_ = bp.pid_;
+        this->addr_ = bp.addr_;
+        this->enabled_ = bp.enabled_;
+        this->data_ = bp.data_;
+    } 
+    return *this;
+}
+
 bool Breakpoint::isEnabled() const {return enabled_;}     
 std::uint8_t Breakpoint::getData() const {return data_;}  
 

@@ -12,6 +12,12 @@
 SymbolMap::SymbolMap() : elf_() {}
 SymbolMap::SymbolMap(const elf::elf& elf) : elf_(elf) {}
 
+SymbolMap& SymbolMap::operator=(SymbolMap&& other) {
+    if(this != &other) {
+        
+    }
+}
+
 std::string SymbolMap::getNameFromSym(SymbolMap::Sym s) const {
     switch(s) {
         case Sym::notype:
@@ -56,7 +62,7 @@ const std::vector<SymbolMap::Symbol>& SymbolMap::getSymbolListFromName(const std
 
     for(auto& section : elf_.sections()) {
         auto type = section.get_hdr().type;
-        if(type != elf::sht::symtab || type != elf::sht::dynsym) continue;
+        if(type != elf::sht::symtab && type != elf::sht::dynsym) continue;
 
         for(auto symbol : section.as_symtab()) {
             if(symbol.get_name() == name) {
@@ -69,7 +75,7 @@ const std::vector<SymbolMap::Symbol>& SymbolMap::getSymbolListFromName(const std
         }
     }
 
-    symbolCache[name] = v;
+    symbolCache[name] = std::move(v);
     it = symbolCache.find(name);
     return it->second;
     

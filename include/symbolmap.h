@@ -13,6 +13,8 @@ class SymbolMap {
 public:
     SymbolMap();
     SymbolMap(const elf::elf& elf);
+    SymbolMap& operator=(SymbolMap&& other);
+
 
     enum class Sym {
         notype,

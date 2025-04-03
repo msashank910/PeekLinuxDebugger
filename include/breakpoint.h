@@ -14,7 +14,9 @@ class Breakpoint {
     static constexpr std::uint8_t mask_ = 0xFF;
 
 public:
+    Breakpoint();
     Breakpoint(pid_t pid, std::intptr_t addr);
+    Breakpoint& operator=(Breakpoint&& bp);
 
     bool isEnabled() const;
     std::uint8_t getData() const;
