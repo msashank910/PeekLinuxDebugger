@@ -3,6 +3,7 @@
 #include "../include/register.h"
 #include "../include/breakpoint.h"
 #include "../include/memorymap.h"
+#include "../include/symbolmap.h"
 
 #include <dwarf/dwarf++.hh>
 #include <elf/elf++.hh>
@@ -37,6 +38,9 @@ Debugger::Debugger(pid_t pid, std::string progName) : pid_(pid), progName_(std::
     
     elf_ = elf::elf(elf::create_mmap_loader(fd));
     dwarf_ = dwarf::dwarf(dwarf::elf::create_loader(elf_));
+    symMap_ = SymbolMap(elf_);
+    
+    close(fd);
 }
 
 void Debugger::initializeMemoryMapAndLoadAddress() {

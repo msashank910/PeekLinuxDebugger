@@ -14,7 +14,14 @@ class MemoryMap {
 public: 
     MemoryMap();    //default until actually constructed in initializeMemoryMapAndLoadAddress()
     MemoryMap(pid_t pid_, const std::string& pathToExecutable);
-    MemoryMap& operator=(MemoryMap&& other);
+
+    MemoryMap(MemoryMap&&);
+    MemoryMap& operator=(MemoryMap&&);
+    ~MemoryMap();
+
+    MemoryMap(const MemoryMap&);
+    MemoryMap& operator=(const MemoryMap&);
+    
     void reload();
     //parseProcPidMaps()
     

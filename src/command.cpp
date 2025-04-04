@@ -61,13 +61,22 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
         //return false;
     }
     else if(argv[0] == "debug") {
-        //print memmap
-        if(argv.size() > 1 && argv[1] == "init") {
-            std::cout << "[debug] Re-initializing...\n";
-            initializeFunctionDies();
-
+        if(argv.size() > 1 && argv[1].length() > 0 && !hasWhiteSpace(argv[1])) {
+            auto cache = symMap_.getSymbolListFromName(argv[1]);
+            if(cache.empty()) {
+                std::cout << "No symbols found for " << argv[1];
+                return true;
+            }
+            std::cout << "--------------------------------------------------------\n";
+            std::cout << "[debug] Symbols with name " << argv[1] << ":\n";
+            int symCount = 1;
+            for(const auto&[sym, type, addr] : cache) {
+                std::cout << "\t" << std::dec << symCount++ << ") " << type
+                    << " --> " << std::hex << std::uppercase << addr << "\n";
+            }
+            std::cout << "--------------------------------------------------------";
         }
-        dumpFunctionDies();
+        else std::cout << "[error] Symbol name is invalid!";
     }
     else if(isPrefix(argv[0], "breakpoint")) {
         //std::cout << "Placing breakpoint\n";
@@ -399,6 +408,26 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
     else if(argv[0] == "dump_chunks" || argv[0] == "dc") {
         std::cout << "[debug] Dumping all memory chunks...\n";
         memMap_.dumpChunks();
+    }
+    else if(argv[0] == "dump_symbols" || argv[0] == "ds") {
+
+        if(argv.size() > 1 && argv[1].length() > 0 && !hasWhiteSpace(argv[1])) {
+            std::cout << "[debug] Dumping symbol cache for " << argv[1] << " ...\n";
+            symMap_.dumpSymbolCache(argv[1]);
+            return true;
+        }
+        std::cout << "[debug] Dumping all symbol caches...\n";
+        symMap_.dumpSymbolCache();
+
+    }
+    else if(argv[0] == "dump_functions" || argv[0] == "df") {
+        std::cout << "[debug] Dumping all function DIEs...\n";
+        if(argv.size() > 1 && argv[1] == "init") {
+            std::cout << "[debug] Re-initializing...\n";
+            initializeFunctionDies();
+
+        }
+        dumpFunctionDies();
     }
     else if(argv[0] == "help") {
         std::cout << "[info] Welcome to Peek!";

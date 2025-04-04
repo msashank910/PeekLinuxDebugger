@@ -7,6 +7,10 @@
 #include <sstream>
 #include <string_view>
 #include <charconv>
+#include <optional>
+#include <memory>       //for unique pointers
+#include <cxxabi.h>     //for demangling - part of libstdc++ ABI in linux (for gcc and clang)
+
 
 //Helpers 
 
@@ -55,4 +59,21 @@ namespace util {
         }
         return false;
     }
+
+
+    bool hasWhiteSpace(const std::string_view s) {
+        return s.find_first_of(" \t") != std::string_view::npos;
+    }
+
+
+    std::optional<std::string> demangleSymbol(const std::string& symbol) {
+        int status;
+        std::unique_ptr<char, decltype(&free)> demangled(abi::__cxa_demangle
+                (symbol.data(), nullptr, nullptr, &status), free);
+
+        if(!demangled || status )   //implicitly casted to boolean (0 means false)
+            return std::nullopt;
+        return std::string(demangled.get());
+    }
+
 }

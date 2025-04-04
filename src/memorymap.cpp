@@ -32,8 +32,7 @@ const std::array<MemoryMap::PathDescriptor, 10> MemoryMap::pathDescriptorList {{
 
 bool MemoryMap::MemoryChunk::isExec() const { return path == Path::exec; }
 
-MemoryMap::MemoryMap() : pid_(0), exec_("") {}
-
+MemoryMap::MemoryMap() = default;
 MemoryMap::MemoryMap(pid_t pid, const std::string& pathToExectuable) : pid_ (pid), exec_(pathToExectuable) {
     std::ifstream file;
     file.open("/proc/" + std::to_string(pid) + "/maps");
@@ -76,24 +75,20 @@ MemoryMap::MemoryMap(pid_t pid, const std::string& pathToExectuable) : pid_ (pid
         chunks_.emplace_back(MemoryChunk(low, high, perms, path, pathname)); //fix suffix logic
     }
 
-}
+    file.close();
 
-MemoryMap& MemoryMap::operator=(MemoryMap&& other) {
-    if(this != &other) {
-        this->pid_ = other.pid_;
-        this->exec_ = std::move(other.exec_);
-        this->chunks_ = std::move(other.chunks_);
-    }
-    return *this;
 }
 
 
-const std::vector<MemoryMap::MemoryChunk>& MemoryMap::getChunks() const {
-    return chunks_;
-}
+MemoryMap::MemoryMap(MemoryMap&&) = default;
+MemoryMap& MemoryMap::operator=(MemoryMap&&) = default;
+MemoryMap::~MemoryMap() = default;
+
+MemoryMap::MemoryMap(const MemoryMap&) = delete;
+MemoryMap& MemoryMap::operator=(const MemoryMap&) = delete;
 
 
- MemoryMap::Path MemoryMap::getPathFromFullPathname(std::string_view pathname) const {
+MemoryMap::Path MemoryMap::getPathFromFullPathname(std::string_view pathname) const {
     if(pathname[0] == '/') {
         auto sharedLibraryCheck = pathname.find(".so");
         if(sharedLibraryCheck != std::string_view::npos) {
@@ -126,6 +121,10 @@ const std::vector<MemoryMap::MemoryChunk>& MemoryMap::getChunks() const {
 void MemoryMap::reload() {
     MemoryMap newMM(pid_, exec_);
     chunks_ = std::move(newMM.chunks_);
+}
+
+const std::vector<MemoryMap::MemoryChunk>& MemoryMap::getChunks() const {
+    return chunks_;
 }
 
 std::string MemoryMap::getNameFromPath(Path p) {

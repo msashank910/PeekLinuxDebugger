@@ -16,7 +16,13 @@ class Breakpoint {
 public:
     Breakpoint();
     Breakpoint(pid_t pid, std::intptr_t addr);
-    Breakpoint& operator=(Breakpoint&& bp);
+    
+    Breakpoint(Breakpoint&&);
+    Breakpoint& operator=(Breakpoint&&);
+    ~Breakpoint();
+    
+    Breakpoint(const Breakpoint&);
+    Breakpoint& operator=(const Breakpoint&);
 
     bool isEnabled() const;
     std::uint8_t getData() const;

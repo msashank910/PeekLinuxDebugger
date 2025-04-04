@@ -13,7 +13,14 @@ class SymbolMap {
 public:
     SymbolMap();
     SymbolMap(const elf::elf& elf);
-    SymbolMap& operator=(SymbolMap&& other);
+    
+    SymbolMap(SymbolMap&&);
+    SymbolMap& operator=(SymbolMap&&);
+    ~SymbolMap();
+
+    SymbolMap(const SymbolMap&);
+    SymbolMap& operator=(const SymbolMap&);
+
 
 
     enum class Sym {
@@ -35,9 +42,11 @@ public:
     Sym getSymFromElf(elf::stt s) const;
 
     const std::vector<Symbol>& getSymbolListFromName(const std::string& name);
+    void dumpSymbolCache() const;
+    void dumpSymbolCache(const std::string& name) const;
     
 private:
-    const elf::elf elf_;
+    elf::elf elf_;
     std::unordered_map<std::string, std::vector<Symbol>> symbolCache;
 
 };
