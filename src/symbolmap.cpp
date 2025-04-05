@@ -75,7 +75,11 @@ const std::vector<SymbolMap::Symbol>& SymbolMap::getSymbolListFromName(const std
             auto demangled = demangleSymbol(symName);
             
             if(demangled) symName = demangled.value();
-            std::cout << "Symbol (mangled, demangled): " << symbol.get_name() << ", " << symName << "\n";
+            if(symName.find(name) != std::string::npos) {
+                std::cout /*<< "Symbol mangled: " << symbol.get_name()*/
+                    << "[unmangled] --> " << symName << "\n";
+
+            }
 
             if(symName == name) {
                 auto& symData = symbol.get_data();
