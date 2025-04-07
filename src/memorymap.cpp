@@ -31,6 +31,9 @@ const std::array<MemoryMap::PathDescriptor, 10> MemoryMap::pathDescriptorList {{
 
 
 bool MemoryMap::MemoryChunk::isExec() const { return path == Path::exec; }
+bool MemoryMap::MemoryChunk::contains(uint64_t addr) const { 
+    return (addrLow <= addr) && (addr < addrHigh);
+}
 
 MemoryMap::MemoryMap() = default;
 MemoryMap::MemoryMap(pid_t pid, const std::string& pathToExectuable) : pid_ (pid), exec_(pathToExectuable) {
@@ -216,12 +219,7 @@ void MemoryMap::dumpChunks() const {
 
 std::optional<std::reference_wrapper<const MemoryMap::MemoryChunk>>MemoryMap::getChunkFromAddr(uint64_t addr) const {
     for(const auto& c : chunks_) {
-        auto low = c.addrLow;
-        auto high = c.addrHigh;
-        
-        if(addr >= low && addr <= high ) {
-            return std::reference_wrapper<const MemoryChunk>(c);
-        }
+        if(c.contains(addr)) return c;
     }
     return std::nullopt;
 }

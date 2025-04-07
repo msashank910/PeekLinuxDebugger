@@ -56,14 +56,15 @@ public:
     };
 
     struct MemoryChunk {
-        uint64_t addrLow;
-        uint64_t addrHigh;
+        uint64_t addrLow;   //inclusive
+        uint64_t addrHigh;  //non-inclusive
         Permissions perms;
         Path path;
         std::string pathname;
        // const std::string pathSuffix;     //can be empty if path type has no suffix
         //suffix/tid may be needed later 
-        bool isExec() const;
+        bool isExec() const;    //could be static
+        bool contains(uint64_t addr) const;     //return if addr in range [addrLow, addrHigh]
     };
 
 

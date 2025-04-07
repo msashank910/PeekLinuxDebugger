@@ -22,6 +22,7 @@ class Debugger {
     uint64_t loadAddress_;
     bool exit_;
     uint8_t context_;
+    Breakpoint* retAddrFromMain_;
 
     dwarf::dwarf dwarf_;
     elf::elf elf_;
@@ -31,12 +32,13 @@ class Debugger {
     std::unordered_map<std::intptr_t, Breakpoint> addrToBp_;
     std::unordered_map<const dwarf::compilation_unit*, std::vector<dwarf::section_offset>> functionDies_;
 
-    Breakpoint retAddrFromMain;
 
+    void initialize();
     bool handleCommand(const std::string& args, std::string& prevArgs);   //bool used for spacing
+    void cleanup();
     
     std::pair<std::unordered_map<intptr_t, Breakpoint>::iterator, bool> 
-        setBreakpointAtAddress(std::intptr_t address);
+        setBreakpointAtAddress(std::intptr_t address/*, bool skipLineTableCheck = false*/);
     std::pair<std::unordered_map<intptr_t, Breakpoint>::iterator, bool> 
         setBreakpointAtFunctionName(const std::string_view name);
     std::pair<std::unordered_map<intptr_t, Breakpoint>::iterator, bool> 
@@ -64,7 +66,7 @@ class Debugger {
     pid_t getPID() const;
     uint8_t getContext() const;
     void setContext(uint8_t context);
-    void initializeMemoryMapAndLoadAddress();
+    void initializeMapsAndLoadAddress();
     uint64_t offsetLoadAddress(uint64_t addr) const;
     uint64_t addLoadAddress(uint64_t addr) const;
     uint64_t getPCOffsetAddress() const;

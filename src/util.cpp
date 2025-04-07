@@ -66,6 +66,14 @@ namespace util {
     }
 
 
+    /*
+        Handle demangling of symbols below. The demangling process uses the libstdc++ ABI library in linux.
+        The demangling doesn't fully result in a readable string - so I take steps to make common symbols more 
+        readable. Below is my naive approach. It is not exhaustive but allows support for additional support 
+        in the future.
+    */
+
+
     std::optional<std::string> demangleSymbol(const std::string& symbol) {
         int status;
         std::unique_ptr<char, decltype(&free)> demangled(abi::__cxa_demangle
@@ -156,13 +164,16 @@ namespace util {
                 index = readable.find(instance, index);
             }
         }
+        
         for(const auto& instance : deleteList) {
             auto index = readable.find(instance);
             while(index != std::string::npos) {     //guaranteed not to be infinite loop due to deletions
-                int openAngleCount = (index < readable.length() - 1 && readable[index+1] == '<' ? 1 : 0);
+                auto posAfterEndOfIndex = index + instance.length();
+                int openAngleCount = (posAfterEndOfIndex < (readable.length()) 
+                    && readable[posAfterEndOfIndex] == '<' ? 1 : 0);
                 int deletionLength = instance.length() + openAngleCount;
 
-                while(openAngleCount != 0) {
+                while(openAngleCount >= 1) {
                     auto openAnglePos = readable.find_first_of('<', index + deletionLength);
                     auto closeAnglePos = readable.find_first_of('>', index + deletionLength);
                     /*
@@ -193,15 +204,15 @@ namespace util {
                 index = readable.find(instance);        //due to deletion, no need to offset index
             }
         }
+        
         for(const auto&[instance, templateArgCount] : containerParameterList) { //one-indexed arg-count
             auto index = readable.find(instance);   //increment index to prevent infinite loop
-            auto openAnglePos = readable.find_first_of('<');
+            auto openAnglePos = readable.find_first_of('<', index + instance.length());
 
             while(index != std::string::npos && openAnglePos != std::string::npos) {     
                 int openAngleCount = 1;
                 int currArg = 1;
                 int startDeletion = -1;     //check if still negative later before starting deletion
-                int deletionLength = 0;
                 /*
                 First, we need to check if a comma exists. If a container is already in form: 
                 container<template>, there is no point in iterating through the characters. That is why 
@@ -239,10 +250,11 @@ namespace util {
                     if(openAngleCount < 1) {    //exits loop when template params are already optimal
                         break;
                     }
-                    else if(openAngleCount > 1) continue;
+                    else if(openAngleCount > 1 || readable[i] != ',') continue;
                     else if(openAngleCount == 1 && templateArgCount > currArg) {
-                        //i is incremented to the next position of an openAngleBracket
-                        i = readable.find_first_of("<>", i);    
+                        //i is incremented to the next position of an openAngleBracket or the next comma
+                        //This checks for 1) sub-template args and 2) handles primatives/objects
+                        i = readable.find_first_of("<,", i);  
                         ++currArg;
                         continue;
                     }
@@ -263,7 +275,7 @@ namespace util {
                         2) The template parameters are already optimal.
                     Both of these means that we can move onto the next instance.
                 */
-                if(startDeletion == -1) {  
+                if(startDeletion == -1) {   //look for more instances
                     index = readable.find(instance, instance.length() + index);
                     openAnglePos = readable.find_first_of('<', index);
                     continue;
@@ -271,8 +283,10 @@ namespace util {
                     //         "Could not resolve template arguments in template function!");
                 }
 
+                int deletionLength = 0;
+
                 //begin iterating, looking for useless template args
-                while(openAngleCount != 0) {
+                while(openAngleCount >= 1) {
                     auto openAnglePos = readable.find_first_of('<', startDeletion + deletionLength);
                     auto closeAnglePos = readable.find_first_of('>', startDeletion + deletionLength);
                     
@@ -280,7 +294,7 @@ namespace util {
                         throw std::logic_error("[fatal] In util::demangledToReadable() - "
                             "no template arguments found for template function!");
                     }
-                    else if(openAnglePos == std::string::npos) {
+                    else if(openAnglePos == std::string::npos) {    //can simplify this later
                         deletionLength = closeAnglePos - startDeletion + 1;
                         --openAngleCount; //should be zero now
                         //DEBUG STATEMENT

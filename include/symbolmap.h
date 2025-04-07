@@ -12,7 +12,7 @@ class SymbolMap {
 
 public:
     SymbolMap();
-    SymbolMap(const elf::elf& elf);
+    SymbolMap(const elf::elf& elf, const uint64_t loadAddress);
     
     SymbolMap(SymbolMap&&);
     SymbolMap& operator=(SymbolMap&&);
@@ -38,15 +38,18 @@ public:
         uintptr_t addr;
     };
 
-    std::string getNameFromSym(Sym s) const;
+    static std::string getNameFromSym(Sym s);
     Sym getSymFromElf(elf::stt s) const;
 
-    const std::vector<Symbol>& getSymbolListFromName(const std::string& name);
-    void dumpSymbolCache() const;
-    void dumpSymbolCache(const std::string& name) const;
+    std::vector<Symbol> getSymbolListFromName(const std::string& name, bool strict = true);
+    static void dumpSymbolList(const std::vector<Symbol>& symbolList, const std::string& name, 
+        bool strict = true);
+    void dumpSymbolCache(bool strict = true) const;
+    void dumpSymbolCache(const std::string& name, bool strict = true) const;
     
 private:
     elf::elf elf_;
-    std::unordered_map<std::string, std::vector<Symbol>> symbolCache;
+    uint64_t loadAddress_;
+    std::unordered_map<std::string, std::vector<Symbol>> nonStrictSymbolCache_;
 
 };

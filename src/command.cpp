@@ -15,6 +15,7 @@
 #include <unordered_map>
 #include <bit>
 #include <algorithm>
+//#include 
 
 
 //using namespaces util and reg
@@ -23,17 +24,12 @@ using namespace reg;
 
 //Debugger function: run()
 void Debugger::run() {
-    waitForSignal();                            //debugger has control after ptrace TRACE_ME
-    initializeMemoryMapAndLoadAddress();        //initialize memory map and load addr from /proc/pid/maps
-    initializeFunctionDies();                   //initialize user function DIEs from dwarf info
-    setBreakpointAtFunctionName("main");        //sets a breakpoint on the first valid entry of int main()
-    continueExecution();                        //continues until main() bp is hit
-    auto fp = getRegisterValue(pid_, Reg::rbp); //frame pointer of main is retrieved
-    uint64_t retAddr;
-    readMemory(fp + 8, retAddr);        //return address of main is initialized
-    retAddrFromMain = Breakpoint(pid_, retAddr);
-    //retAddrFromMain.enable();
-    //setBreakpointAtAddress(std::bit_cast<intptr_t>(retAddrFromMain));   //breakpoint is set return address
+    //std::cerr << "DEBUG: Calling waitForSignal() in run() \n";
+
+    waitForSignal();                       //debugger has control after ptrace TRACE_ME
+    //std::cerr << "DEBUG: Calling initialize() in run() \n";
+
+    initialize();
 
     char* line;
     std::string prevArgs = "";
@@ -42,6 +38,29 @@ void Debugger::run() {
         linenoiseHistoryAdd(line);  //may need to initialize history
         linenoiseFree(line);
     }
+}
+
+//Debugger function: cleanUp()
+void Debugger::cleanup() {
+    //handle breakpoint cleanup
+    retAddrFromMain_ = nullptr;
+
+    for(auto& it : addrToBp_) {
+        //std::cerr << "DEBUG: disabling bp!\n";
+        if(it.second.isEnabled()) it.second.disable();
+    }
+    // dumpBreakpoints();
+    // dumpFunctionDies();
+    // dumpRegisters();
+    // memMap_.dumpChunks();
+    // symMap_.dumpSymbolCache();
+
+    std::cout << "[debug] Cleanup has been completed. Press [Enter] to exit the debugger. ";
+    std::string debugString;
+    std::getline(std::cin, debugString);
+    //detach from process
+   // ptrace(PTRACE_TRACEME, 0, nullptr, nullptr);
+
 }
 
 //Debugger function: handleCommand()
@@ -60,21 +79,15 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
         printMemoryLocationAtPC();
         //return false;
     }
-    else if(argv[0] == "debug") {
+    else if(argv[0] == "debug") {   //debug command args currently - "debug" <name> ["strict"]
         if(argv.size() > 1 && argv[1].length() > 0 && !hasWhiteSpace(argv[1])) {
-            auto cache = symMap_.getSymbolListFromName(argv[1]);
-            if(cache.empty()) {
-                std::cout << "No symbols found for " << argv[1];
-                return true;
-            }
-            std::cout << "--------------------------------------------------------\n";
-            std::cout << "[debug] Symbols with name " << argv[1] << ":\n";
-            int symCount = 1;
-            for(const auto&[sym, type, addr] : cache) {
-                std::cout << "\t" << std::dec << symCount++ << ") " << type
-                    << " --> " << std::hex << std::uppercase << addr << "\n";
-            }
-            std::cout << "--------------------------------------------------------";
+            bool strict = argv.size() > 2 && argv[2] == "strict";
+            auto list = symMap_.getSymbolListFromName(argv[1], strict);
+
+            std::cout << "[debug] Symbols with name '" << argv[1] 
+                << "':\n--------------------------------------------------------\n";
+            SymbolMap::dumpSymbolList(list, argv[1], strict);
+            std::cout << "--------------------------------------------------------"; 
         }
         else std::cout << "[error] Symbol name is invalid!";
     }
@@ -200,7 +213,22 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
                 if(relativeAddr) {
                     addr = addLoadAddress(addr);
                 }
+                
                 auto it = addrToBp_.find(std::bit_cast<intptr_t>(addr));
+
+                if(retAddrFromMain_ && retAddrFromMain_ == &(it->second) && retAddrFromMain_->isEnabled()) {
+                    std::cerr << "[warning] Attemping to disable breakpoint at the return address of main. "
+                        "Confirm with [y/n]: ";
+                    std::string input = "";
+                    std::getline(std::cin, input);
+                    if(input.length() > 0 && (input[0] == 'y' || input[0] == 'Y')) {
+                        std::cerr << "[warning] Breakpoint at return address of main has been disable!\n";
+                    }
+                    else {
+                        std::cout << "[debug] Aborting breakpoint disable.";
+                        return true;
+                    }
+                }
                 
                 if(it != addrToBp_.end()) {
                     if(it->second.isEnabled()) it->second.disable();
@@ -412,11 +440,11 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
     else if(argv[0] == "dump_symbols" || argv[0] == "ds") {
 
         if(argv.size() > 1 && argv[1].length() > 0 && !hasWhiteSpace(argv[1])) {
-            std::cout << "[debug] Dumping symbol cache for " << argv[1] << " ...\n";
+            std::cout << "[debug] Dumping symbol cache for " << argv[1] << " ...";
             symMap_.dumpSymbolCache(argv[1]);
             return true;
         }
-        std::cout << "[debug] Dumping all symbol caches...\n";
+        std::cout << "[debug] Dumping all symbol caches...";
         symMap_.dumpSymbolCache();
 
     }

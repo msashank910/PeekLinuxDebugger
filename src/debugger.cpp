@@ -33,50 +33,71 @@ using util::validDecStol;
 
 //Debugger Member Functions
 Debugger::Debugger(pid_t pid, std::string progName) : pid_(pid), progName_(std::move(progName)), 
-    loadAddress_(0), exit_(false), context_(2) {
+    loadAddress_(0), exit_(false), context_(2), retAddrFromMain_(nullptr) {
     auto fd = open(progName_.c_str(), O_RDONLY);
     
     elf_ = elf::elf(elf::create_mmap_loader(fd));
     dwarf_ = dwarf::dwarf(dwarf::elf::create_loader(elf_));
-    symMap_ = SymbolMap(elf_);
+    //std::cerr << "DEBUG: Close fd in constructor \n";
     
     close(fd);
+    //std::cerr << "DEBUG: Finished constructor \n";
+
 }
 
-void Debugger::initializeMemoryMapAndLoadAddress() {
+void Debugger::initialize() {
+    initializeMapsAndLoadAddress(); //initialize mem map, sym map and load addr from /proc/pid/maps
+    initializeFunctionDies();       //initialize user function DIEs from dwarf info
+
+    //sets a breakpoint on the first valid entry of int main(), skips lineTable check in setBreakpoint()
+    auto [mainBp, success] = setBreakpointAtFunctionName("main");
+    if(!success) {
+        std::cerr << "\n[critical] Could not set a breakpoint on first valid line in main().\n"
+        "[critical] Could not set a breakpoint on the return address of main().\n";
+        return;
+    }        
+    continueExecution();    
+    removeBreakpoint(mainBp);
+
+    //sets a breakpoint on the return address of int main(), skips lineTable check in setBreakpoint()
+    auto fp = getRegisterValue(pid_, Reg::rbp); 
+    uint64_t retAddr;
+    readMemory(fp + 8, retAddr); 
+    auto[it, inserted] = setBreakpointAtAddress(std::bit_cast<intptr_t>(retAddr));
+
+    if(!inserted || it == addrToBp_.end()) {
+        std::cerr << "\n[critical] Could not set a breakpoint on the return address of main().\n";
+        retAddrFromMain_ = nullptr;        //redundant, but for safety
+    }
+    else retAddrFromMain_ = &it->second;
+}
+
+void Debugger::initializeMapsAndLoadAddress() {
     if(elf_.get_hdr().type == elf::et::dyn) {
-        
         std::unique_ptr<char, decltype(&free)> ptr(realpath(progName_.c_str(), nullptr), free);
         if(!ptr) {
-            throw std::logic_error(std::string("\n[fatal] In Debugger::initializeMemoryMapAndLoadAddress - ") 
+            throw std::logic_error(std::string("\n[fatal] In Debugger::initializeMemoryMapAndLoadAddress() - ") 
                 + " Invalid or nonexistant program name, realpath() failed!\n");
         }
 
         std::string absFilePath = ptr.get();
         memMap_ = MemoryMap(pid_, absFilePath);
+        uint64_t foundLoadAddress = UINT64_MAX;
 
-        std::ifstream file;
-        file.open("/proc/" + std::to_string(getPID()) + "/maps");
-        if(!file.is_open()) {
-            throw std::runtime_error(std::string("\n[fatal] In Debugger::initializeMemoryMapAndLoadAddress - ")
-                + "/proc/pid/maps could not be opened! Check permisions.\n");
+        for(auto& chunk : memMap_.getChunks()) {
+            if(chunk.isExec()) {
+                foundLoadAddress = std::min(chunk.addrLow, foundLoadAddress);
+            }
         }
-        std::string addr = "";
-        std::string possibleFilePath = "";
-
-        std::getline(file, addr, '-');
-        std::getline(file, possibleFilePath, '\n');
-        possibleFilePath.erase(0, possibleFilePath.find_last_of(" \t") + 1);
-
-        while(possibleFilePath != absFilePath && std::getline(file, addr, '-')) {
-            std::getline(file, possibleFilePath, '\n');
-            possibleFilePath.erase(0, possibleFilePath.find_last_of(" \t") + 1);
-        } 
-        
-        file.close();
-        loadAddress_ = std::bit_cast<uint64_t>(std::stol(addr, nullptr, 16));
+        if(foundLoadAddress == UINT64_MAX) {
+            throw std::runtime_error("\n[fatal] In Debugger::initializeMemoryMapAndLoadAddress() - "
+                "Load address could not be resolved from /proc/pid/maps! Check permisions.\n");
+        }
+        loadAddress_ = foundLoadAddress;
 
     }
+    symMap_ = SymbolMap(elf_, loadAddress_);
+
 }
 
 uint64_t Debugger::offsetLoadAddress(uint64_t addr) const { return addr - loadAddress_;}
@@ -98,17 +119,32 @@ void Debugger::setContext(uint8_t context) {context_ = context;}
 
 
 std::pair<std::unordered_map<intptr_t, Breakpoint>::iterator, bool>
-     Debugger::setBreakpointAtAddress(std::intptr_t address) {
-    auto [it, inserted] = addrToBp_.emplace(address, Breakpoint(pid_, address));
+     Debugger::setBreakpointAtAddress(std::intptr_t address/*, bool skipLineTableCheck*/) {
+    
+    //First check if it is within an executable memory region or in main process memory space
+    auto chunk = memMap_.getChunkFromAddr(address);
+    if(!chunk || !(MemoryMap::canExecute(chunk.value().get()) || chunk.value().get().isExec())) {
+        std::cerr << "[error] Invalid Memory Address!";
+        return {addrToBp_.end(), false};
+    }
+    /* I am abandoning this check for now. This is because it is causing way too many problems 
+    and likely can be revisited in the future.
+    //Then check if it is a valid instruction in the line table (only if not special case)
+    auto lineEntryItr = getLineEntryFromPC(address);
+    if(!skipLineTableCheck && (!lineEntryItr || 
+            std::bit_cast<intptr_t>(lineEntryItr.value()->address) != address)) {
+        std::cerr << "[error] Address is not an instruction!";
+        return {addrToBp_.end(), false};
+    } */
 
+    auto [it, inserted] = addrToBp_.emplace(address, Breakpoint(pid_, address));
     if(inserted) {
-        if(!it->second.enable()) {
+        if(!it->second.enable()) {  //checks for success of breakpoint::enable()
             std::cerr << "[error] Invalid Memory Address!";
             addrToBp_.erase(it);
             return {addrToBp_.end(), false};
         }
     }
-
     return {it, inserted};
 }
 
@@ -290,8 +326,13 @@ void Debugger::singleStep() {
 void Debugger::singleStepBreakpointCheck() {  
     auto addr = std::bit_cast<intptr_t>(getPC());
     auto it = addrToBp_.find(addr);
-
-    if(it == addrToBp_.end()) {
+    
+    /*if(retAddrFromMain_ && it != addrToBp_.end() && retAddrFromMain_ == &(it->second)) {    //time to exit! 
+        cleanup();
+        continueExecution();
+        return;
+    }
+    else */if(it == addrToBp_.end()) {
         singleStep();
         return;
     }
@@ -312,17 +353,48 @@ void Debugger::stepOverBreakpoint() {
 }
 
 void Debugger::removeBreakpoint(intptr_t address) {
+    if(retAddrFromMain_ && retAddrFromMain_->getAddr() == address && retAddrFromMain_->isEnabled()) {
+        std::cerr << "[warning] Attemping to remove breakpoint at the return address of main. "
+            "Confirm with [y/n]: ";
+        std::string input = "";
+        std::getline(std::cin, input);
+        if(input.length() > 0 && (input[0] == 'y' || input[0] == 'Y')) {
+            std::cerr << "[warning] Breakpoint at return address of main has been removed!\n";
+            retAddrFromMain_ = nullptr;
+        }
+        else {
+            std::cout << "[debug] Aborting breakpoint removal\n";
+            return;
+        }
+    }
+
     auto it = addrToBp_.find(address);
-    
     if(it != addrToBp_.end()) {
         if(it->second.isEnabled()) {
             it->second.disable();
         }
         addrToBp_.erase(address);
     }
+    //std::cerr << "DEBUG: bp removed!\n";
+
 }
 
 void Debugger::removeBreakpoint(std::unordered_map<intptr_t, Breakpoint>::iterator it) {
+    if(retAddrFromMain_ && retAddrFromMain_ == &(it->second) && retAddrFromMain_->isEnabled()) {
+        std::cerr << "[warning] Attemping to remove breakpoint at the return address of main. "
+            "Confirm with [y/n]: ";
+        std::string input = "";
+        std::getline(std::cin, input);
+        if(input.length() > 0 && (input[0] == 'y' || input[0] == 'Y')) {
+            std::cerr << "[warning] Breakpoint at return address of main has been removed!\n";
+            retAddrFromMain_ = nullptr;
+        }
+        else {
+            std::cout << "[debug] Aborting breakpoint removal\n";
+            return;
+        }
+    }
+
     if(it != addrToBp_.end()) {
         if(it->second.isEnabled()) {
             it->second.disable();
@@ -396,15 +468,15 @@ void Debugger::stepIn() {       //need to preface with breakpoint on main when y
         pcOffset = getPCOffsetAddress();
     }
 
-    // if(!itr) {
-    //     std::cout << "Stepped into region with no dwarf info, single-stepping instead\n";
-    //     //singleStep();  
-    //     //In future --> resolve end of main, check if stepin is in shared library or out of main
-    //     //If out of main, resort to single stepping, if in shared library:
-    //         //-> revert registers, then stepOver()  
-    // }
+    if(!itr) {
+        std::cout << "[debug] Stepped into region with no dwarf info, single-stepping instead\n";
+        singleStep();  
+        //In future --> resolve end of main, check if stepin is in shared library or out of main
+        //If out of main, resort to single stepping, if in shared library:
+            //-> revert registers, then stepOver()  
+    }
     //else printSourceAtPC();
-    // printSourceAtPC();  //handles valid iterator in memory space check
+    //printSourceAtPC();  //handles valid iterator in memory space check
 }
 
 void Debugger::stepOver() {
@@ -420,11 +492,11 @@ void Debugger::stepOver() {
     auto high = dwarf::at_high_pc(func);
     auto curr = getLineEntryFromPC(low);
 
-    // if(!curr) {
-    //     std::cout << "Function cannot be resolved in line table. Single stepping...\n";
-    //     singleStepBreakpointCheck();
-    //     return;
-    // }
+    if(!curr) {
+        std::cout << "[debug] Function cannot be resolved in line table. Single stepping...\n";
+        singleStepBreakpointCheck();
+        return;
+    }
     
 
     std::vector<std::pair<std::intptr_t, bool>> addrshouldRemove;
@@ -519,24 +591,6 @@ void Debugger::dumpFunctionDies() {
 
 
 dwarf::die Debugger::getFunctionFromPCOffset(uint64_t pc) const {
-    /*
-    for(const auto& cu : dwarf_.compilation_units()) {
-        if(dwarf::die_pc_range(cu.root()).contains(pc)) {
-            for(const auto& die : cu.root()) {
-                if(die.tag == dwarf::DW_TAG::subprogram &&
-                    (die.has(dwarf::DW_AT::low_pc) || die.has(dwarf::DW_AT::ranges))) {
-                        if(dwarf::die_pc_range(die).contains(pc)) return die;
-                }
-            }
-        }
-    }
-    throw std::out_of_range(std::string("\n[fatal] In Debugger::getFunctionFromPCOffset() - ") 
-        + "Function not found for pc. Something is definitely wrong!\n");
-    */
-    // for(const auto& dieRef : functionDies) {
-    //     if(dwarf::die_pc_range(dieRef.get()).contains(pc)) return dieRef.get();
-    // }
-
     for(auto& [cu, offset] : functionDies_) {
         if(dwarf::die_pc_range(cu->root()).contains(pc)) {
             int count = 0;
@@ -640,16 +694,34 @@ void Debugger::waitForSignal() {
         return;
     }
 
+    //std::cerr << "DEBUG: Checking memMap initialize in waitForSignal() \n";
+
     if(memMap_.initialized() && !exit_) memMap_.reload();
 
     auto signal = getSignalInfo();
+    //std::cerr << "DEBUG: Checking signal info in waitForSignal(): " << std::to_string(signal.si_signo) << "\n";
+
     switch(signal.si_signo) {
         case SIGTRAP:
+            //std::cerr << "DEBUG: handling sigtrap in waitForSignal() \n";
+
             handleSIGTRAP(signal);
+            //std::cerr << "DEBUG: Checking returnAddrFromMain in waitForSignal() \n";
+
+            if(retAddrFromMain_ && getPC() == std::bit_cast<uint64_t>(retAddrFromMain_->getAddr())) {
+                cleanup();
+                //std::cerr << "DEBUG: cleanup complete! continuing...\n";
+                continueExecution();
+            }
+            //std::cerr << "DEBUG: Returning from waitForSignal() \n";
+
             return;
         case SIGSEGV:
             std::cerr << "[critical] Segmentation Error: " << signal.si_signo << ", Reason: " << signal.si_code << "\n";
             break;
+        case SIGWINCH:
+            std::cout << "[debug] Ignoring SIGWINCH (window resize)\n";
+            return waitForSignal();
         default:
             std::cerr << "[warning] Signal: " << signal.si_signo << ", Reason: " << signal.si_code << "\n";
             break;

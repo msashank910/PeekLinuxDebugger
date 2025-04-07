@@ -26,6 +26,7 @@ public:
 
     bool isEnabled() const;
     std::uint8_t getData() const;
+    std::intptr_t getAddr() const;
 
     bool enable();
     bool disable();

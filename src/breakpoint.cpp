@@ -21,7 +21,8 @@ Breakpoint& Breakpoint::operator=(const Breakpoint&) = delete;
 
 
 bool Breakpoint::isEnabled() const {return enabled_;}     
-std::uint8_t Breakpoint::getData() const {return data_;}  
+std::uint8_t Breakpoint::getData() const {return data_;} 
+std::intptr_t Breakpoint::getAddr() const {return addr_;}; 
 
 bool Breakpoint::enable() { //Optimize?     //fixed wrong parameters for both ptrace calls
     constexpr std::uint64_t int3 = 0xcc;
