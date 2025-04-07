@@ -33,19 +33,23 @@ Build the project:
 
 To run the debugger:
     
-    ./build/pld ./<file_path_to_debuggee_program>
+    ./build/pld <file_path_to_debuggee_program>
 
-Note: Debugee Program must be compiled with the following flags
+Note: Debugee Program must be compiled with the following flags:
 
     -g -gdwarf04
 
+You may also want to disable optimizations (-O0) for a smoother experience.
+
 While in the [__p|d__] command-line interface, you can interact with the child process via breakpoints, memory manipulation, and register manipulation.
-For a full list of commands, use the help command:
+For a full list of commands, use the help command (currently a WIP):
 
     help
 
-Certain commands can be executed via their prefixes as well
-For example for continue: cont, con, c all work.
+Certain commands can be executed via their prefixes or by shorthand abbreviations as well
+For example:
+    To set a breakpoint - "breakpoint", "break", or "b"
+    To read from a register - "register_read" <register_name> or "rr" <register_name>
 
 📋 Current Limitations
 
