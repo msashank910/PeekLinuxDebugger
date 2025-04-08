@@ -38,11 +38,8 @@ Debugger::Debugger(pid_t pid, std::string progName) : pid_(pid), progName_(std::
     
     elf_ = elf::elf(elf::create_mmap_loader(fd));
     dwarf_ = dwarf::dwarf(dwarf::elf::create_loader(elf_));
-    //std::cerr << "DEBUG: Close fd in constructor \n";
     
     close(fd);
-    //std::cerr << "DEBUG: Finished constructor \n";
-
 }
 
 void Debugger::initialize() {
@@ -129,6 +126,7 @@ std::pair<std::unordered_map<intptr_t, Breakpoint>::iterator, bool>
     }
     /* I am abandoning this check for now. This is because it is causing way too many problems 
     and likely can be revisited in the future.
+    
     //Then check if it is a valid instruction in the line table (only if not special case)
     auto lineEntryItr = getLineEntryFromPC(address);
     if(!skipLineTableCheck && (!lineEntryItr || 
@@ -458,11 +456,10 @@ void Debugger::stepIn() {       //need to preface with breakpoint on main when y
 
     if(!validMemoryRegionShouldStep(itr, true)) return;
     
-    unsigned sourceLine = itr.value()->line;
-    // user_regs_struct regValStruct;
-    // auto rawVals = getAllRegisterValues(pid_, regValStruct);
-    // bool retFromMain = false;
+    user_regs_struct regValStruct;
+    auto success = getAllRegisterValues(pid_, regValStruct);
 
+    unsigned sourceLine = itr.value()->line;
     while((itr = getLineEntryFromPC(pcOffset)) && itr.value()->line == sourceLine) {
         singleStepBreakpointCheck();
         pcOffset = getPCOffsetAddress();

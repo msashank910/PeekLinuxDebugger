@@ -47,10 +47,10 @@ For a full list of commands, use the help command (currently a WIP):
 
     help
 
-Certain commands can be executed via their prefixes or by shorthand abbreviations as well
+Certain commands can be executed via their prefixes or by shorthand abbreviations as well. For example:
 
-For example:
     To set a breakpoint - "breakpoint", "break", or "b"
+
     To read from a register - "register_read" <register_name> or "rr" <register_name>
 
 📋 Current Limitations
@@ -68,6 +68,10 @@ Stack Unwinding
 Handling Variables
 
     Inspect and modify local variables and function parameters during execution.
+
+Multithreading
+
+    Be able to run multiple concurrent debugger instances with control over all of them.
 
 📄 License
 

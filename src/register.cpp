@@ -110,11 +110,11 @@ namespace reg {
 		//return std::bit_cast<uint64_t*>(&rawRegVals);	//dangling pointer if regVals is not a parameter!
 	}
 
-	bool setAllRegisterValues(const pid_t pid, uint64_t* rawRegVals) {
+	bool setAllRegisterValues(const pid_t pid, user_regs_struct& rawRegVals) {
 		errno = 0;
-		static_assert(sizeof(user_regs_struct) % sizeof(uint64_t) == 0, "Mismatched size");
-		auto userRegsStruct = *(std::bit_cast<user_regs_struct*>(rawRegVals));
-		return (ptrace(PTRACE_SETREGS, pid, nullptr, &userRegsStruct) != -1);
+		//static_assert(sizeof(user_regs_struct) % sizeof(uint64_t) == 0, "Mismatched size");
+		//auto userRegsStruct = *(std::bit_cast<user_regs_struct*>(rawRegVals));
+		return (ptrace(PTRACE_SETREGS, pid, nullptr, &rawRegVals) != -1);
 	}
 
 }
