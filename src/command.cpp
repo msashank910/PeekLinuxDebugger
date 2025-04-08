@@ -40,28 +40,7 @@ void Debugger::run() {
     }
 }
 
-//Debugger function: cleanUp()
-void Debugger::cleanup() {
-    //handle breakpoint cleanup
-    retAddrFromMain_ = nullptr;
 
-    for(auto& it : addrToBp_) {
-        //std::cerr << "DEBUG: disabling bp!\n";
-        if(it.second.isEnabled()) it.second.disable();
-    }
-    // dumpBreakpoints();
-    // dumpFunctionDies();
-    // dumpRegisters();
-    // memMap_.dumpChunks();
-    // symMap_.dumpSymbolCache();
-
-    std::cout << "[debug] Cleanup has been completed. Press [Enter] to exit the debugger. ";
-    std::string debugString;
-    std::getline(std::cin, debugString);
-    //detach from process
-   // ptrace(PTRACE_TRACEME, 0, nullptr, nullptr);
-
-}
 
 //Debugger function: handleCommand()
 bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {

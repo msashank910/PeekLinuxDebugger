@@ -9,27 +9,31 @@
 #include <elf/elf++.hh>
 
 #include <iostream>
+#include <unordered_map>
 #include <fstream>
-#include <filesystem>
+// #include <filesystem>
 #include <sys/ptrace.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <signal.h>
 #include <sys/wait.h>
 #include <sys/user.h>
+#include <string>
 #include <cstring>
 #include <bit>
 #include <memory>
+#include <utility>
 #include <stdexcept>
 #include <algorithm>
 #include <cmath>
+#include <optional>
 #include <cctype>
 
 
 
 //Use reg namespace
 using namespace reg;
-using util::validDecStol;
+// using util::validDecStol;
 
 //Debugger Member Functions
 Debugger::Debugger(pid_t pid, std::string progName) : pid_(pid), progName_(std::move(progName)), 
@@ -97,211 +101,27 @@ void Debugger::initializeMapsAndLoadAddress() {
 
 }
 
-uint64_t Debugger::offsetLoadAddress(uint64_t addr) const { return addr - loadAddress_;}
+void Debugger::cleanup() {
+    //handle breakpoint cleanup
+    retAddrFromMain_ = nullptr;
 
-uint64_t Debugger::addLoadAddress(uint64_t addr) const { return addr + loadAddress_;}
-
-
-uint64_t Debugger::getPCOffsetAddress() const {return offsetLoadAddress(getPC());}
-
-pid_t Debugger::getPID() const {return pid_;}
-
-uint64_t Debugger::getPC() const { return getRegisterValue(pid_, Reg::rip); }
-
-bool Debugger::setPC(uint64_t val) { return setRegisterValue(pid_, Reg::rip, val); }
-
-uint8_t Debugger::getContext() const {return context_;}
-
-void Debugger::setContext(uint8_t context) {context_ = context;}
-
-
-std::pair<std::unordered_map<intptr_t, Breakpoint>::iterator, bool>
-     Debugger::setBreakpointAtAddress(std::intptr_t address/*, bool skipLineTableCheck*/) {
-    
-    //First check if it is within an executable memory region or in main process memory space
-    auto chunk = memMap_.getChunkFromAddr(address);
-    if(!chunk || !(MemoryMap::canExecute(chunk.value().get()) || chunk.value().get().isExec())) {
-        std::cerr << "[error] Invalid Memory Address!";
-        return {addrToBp_.end(), false};
-    }
-    /* I am abandoning this check for now. This is because it is causing way too many problems 
-    and likely can be revisited in the future.
-    
-    //Then check if it is a valid instruction in the line table (only if not special case)
-    auto lineEntryItr = getLineEntryFromPC(address);
-    if(!skipLineTableCheck && (!lineEntryItr || 
-            std::bit_cast<intptr_t>(lineEntryItr.value()->address) != address)) {
-        std::cerr << "[error] Address is not an instruction!";
-        return {addrToBp_.end(), false};
-    } */
-
-    auto [it, inserted] = addrToBp_.emplace(address, Breakpoint(pid_, address));
-    if(inserted) {
-        if(!it->second.enable()) {  //checks for success of breakpoint::enable()
-            std::cerr << "[error] Invalid Memory Address!";
-            addrToBp_.erase(it);
-            return {addrToBp_.end(), false};
-        }
-    }
-    return {it, inserted};
-}
-
-
-
-std::pair<std::unordered_map<intptr_t, Breakpoint>::iterator, bool> 
-     Debugger::setBreakpointAtFunctionName(const std::string_view name) {
-    std::vector<dwarf::die> matching;
-    //std::cout << "NAME = |" << name << "| " << std::dec << name.length() << std::endl;
-    for(const auto& [cu, offset] : functionDies_) {
-        int count = 0;
-        for(const auto& die : cu->root()) {
-            if(die.get_unit_offset() == offset[count] && die.has(dwarf::DW_AT::name)) {
-                if(dwarf::at_name(die) == name)
-                    matching.push_back(die);
-                ++count;
-            }
-        }
-    }
-    auto optionalAddr = handleDuplicateFunctionNames(name, matching);
-    if(optionalAddr)
-        return setBreakpointAtAddress(optionalAddr.value());
-    return {addrToBp_.end(), false};    
-}
-
-/*
-    Handle Duplicate function names. Takes in a const ref to a vector of dies.
-*/
-std::optional<intptr_t>Debugger::handleDuplicateFunctionNames(
-    const std::string_view name, const std::vector<dwarf::die>& functions)  {
-   if(functions.empty()) return std::nullopt;
-   else if(functions.size() == 1) {
-       auto low = dwarf::at_low_pc(functions[0]);
-       auto lineEntryItr = getLineEntryFromPC(low);
-       if(!lineEntryItr) {
-           throw std::logic_error("[fatal] In Debugger::setBreakpointAtFunctionName() - "
-               "function definition with low pc does not have valid line entry\n");
-       }
-       auto entry = lineEntryItr.value();
-       auto addr = (++entry)->address;
-       return std::bit_cast<intptr_t>(addLoadAddress(addr));
-   }
-
-   auto funcLocation = [] (dwarf::line_table::iterator& it) {
-       std::filesystem::path path(it->file->path);
-       std::string location = path.filename().string() + ":" + std::to_string(it->line);
-       return location;
-   };
-
-   std::cout << "\n[info] Multiple matches found for '" << name << "':\n";
-   int count = 0;
-   for(const auto& die : functions) {
-       // auto& die = dieRef.get();
-       auto low = dwarf::at_low_pc(die);
-       auto lineEntryItr = getLineEntryFromPC(low);
-       if(!lineEntryItr) {
-           throw std::logic_error("[fatal] In Debugger::setBreakpointAtFunctionName() - "
-               "function definition with low pc does not have valid line entry\n");
-       }
-       auto entry = lineEntryItr.value();
-       std::cout << std::dec << "\t[" << count++ << "] " << dwarf::at_name(die)
-           << " at " << funcLocation(entry) << "\n";
-   }
-
-   std::cout << "\n[info] Select one to set a breakpoint (or abort): ";
-   std::string selection;
-   std::cin >> selection;
-   count = 0;
-   uint64_t index;
-
-   if(validDecStol(index, selection) && index < functions.size()) {
-       auto& die = functions[index];
-       auto lineEntry = getLineEntryFromPC(dwarf::at_low_pc(die));
-       auto addr = (++(lineEntry.value()))->address;
-       //std::cout << "\n";
-       return std::bit_cast<intptr_t>(addLoadAddress(addr));
-   }
-   return std::nullopt;
-}
-
-
-std::pair<std::unordered_map<intptr_t, Breakpoint>::iterator, bool> 
-     Debugger::setBreakpointAtSourceLine(const std::string_view file, const unsigned line) {
-    std::vector<std::pair<std::string, intptr_t>> filepathAndAddr;
-    std::filesystem::path filePath(file);
-
-    for(auto& cu : dwarf_.compilation_units()) {
-        auto& root = cu.root();
-        if(root.has(dwarf::DW_AT::name)) {      //check conflicting filepaths
-            std::filesystem::path diePath(dwarf::at_name(root));  
-            if(diePath.filename() == filePath.filename()) {
-                auto& lt = cu.get_line_table();
-                for(auto entry : lt) {
-                    if(entry.line == line && entry.is_stmt ) {
-                        auto addr = std::bit_cast<intptr_t>(entry.address);
-                        //return setBreakpointAtAddress(addr);
-                        filepathAndAddr.push_back({dwarf::at_name(root), addr});
-                        break;
-                    }
-                }
-            }
-        }
-    }
-    auto optionalAddr = handleDuplicateFilenames(file, filepathAndAddr);
-    if(optionalAddr)
-        return setBreakpointAtAddress(optionalAddr.value());
-    return {addrToBp_.end(), false};
-}
-
-std::optional<intptr_t>Debugger::handleDuplicateFilenames( const std::string_view filepath,
-    const std::vector<std::pair<std::string, intptr_t>>& fpAndAddr)  {
-   if(fpAndAddr.empty()) return std::nullopt;
-   else if(fpAndAddr.size() == 1) {     //comment this else-if block out when testing
-       auto addr = fpAndAddr[0].second;
-       return std::bit_cast<intptr_t>(addLoadAddress(addr));
-   }
-
-   std::cout << "\n[info] Multiple matches found for '" << filepath << "':\n";
-   int count = 0;
-   for(const auto&[fp, addr] : fpAndAddr) {
-       std::cout << std::dec << "\t[" << count++ << "] " << fp
-           << " at 0x" << std::hex << std::uppercase << addr 
-           << " (0x" << addLoadAddress(addr) << ")\n";
-   }
-
-   std::cout << "\n[info] Select one to set a breakpoint (or abort): ";
-   std::string selection;
-   std::cin >> selection;
-   count = 0;
-   uint64_t index;
-   if(validDecStol(index, selection) && index < fpAndAddr.size()) {
-       auto addr = std::bit_cast<uint64_t>(fpAndAddr[index].second);
-       return std::bit_cast<intptr_t>(addLoadAddress(addr));
-   }
-   return std::nullopt;
-}
-
-
-
-
-
-void Debugger::dumpBreakpoints() const {
-    if(addrToBp_.empty()) {
-        std::cout << "[error] No breakpoints set!";
-        return;
-    }
-    int count = 1;
     for(auto& it : addrToBp_) {
-        auto addr = std::bit_cast<uint64_t>(it.first);
-
-        std::cout << "\n" << std::dec << count << ") 0x" << std::hex << std::uppercase << addr 
-            << " (0x" << offsetLoadAddress(addr) << ")"
-            << " [" << ((it.second.isEnabled()) ? "enabled" : "disabled") << "]";
-        ++count;
+        //std::cerr << "DEBUG: disabling bp!\n";
+        if(it.second.isEnabled()) it.second.disable();
     }
-    std::cout << std::endl;
+    // dumpBreakpoints();
+    // dumpFunctionDies();
+    // dumpRegisters();
+    // memMap_.dumpChunks();
+    // symMap_.dumpSymbolCache();
+
+    std::cout << "[debug] Cleanup has been completed. Press [Enter] to exit the debugger. ";
+    std::string debugString;
+    std::getline(std::cin, debugString);
+    //detach from process
+   // ptrace(PTRACE_TRACEME, 0, nullptr, nullptr);
+
 }
-
-
 
 void Debugger::continueExecution() {
     stepOverBreakpoint();
@@ -310,228 +130,18 @@ void Debugger::continueExecution() {
 
 }
 
-void Debugger::singleStep() {
-    errno = 0;
-    long res = ptrace(PTRACE_SINGLESTEP, pid_, nullptr, nullptr);
-
-    if(res == -1) {
-        throw std::runtime_error("\n[fatal] In Debugger::singleStep() - ptrace error: " 
-            + std::string(strerror(errno)) + "..\n[fatal] Single Step Failed!\n");
-    }
-    waitForSignal();
-}
-
-void Debugger::singleStepBreakpointCheck() {  
-    auto addr = std::bit_cast<intptr_t>(getPC());
-    auto it = addrToBp_.find(addr);
-    
-    /*if(retAddrFromMain_ && it != addrToBp_.end() && retAddrFromMain_ == &(it->second)) {    //time to exit! 
-        cleanup();
-        continueExecution();
-        return;
-    }
-    else */if(it == addrToBp_.end()) {
-        singleStep();
-        return;
-    }
-    stepOverBreakpoint();
-}
-
-void Debugger::stepOverBreakpoint() {
-    uint64_t addr = getPC();        //pc points to bp, is altered
-    auto it = addrToBp_.find(std::bit_cast<intptr_t>(addr));
-
-    if(it != addrToBp_.end()) {
-        if(it->second.isEnabled()) {
-            it->second.disable();
-            singleStep();
-            it->second.enable();
-        }
-    }
-}
-
-void Debugger::removeBreakpoint(intptr_t address) {
-    if(retAddrFromMain_ && retAddrFromMain_->getAddr() == address && retAddrFromMain_->isEnabled()) {
-        std::cerr << "[warning] Attemping to remove breakpoint at the return address of main. "
-            "Confirm with [y/n]: ";
-        std::string input = "";
-        std::getline(std::cin, input);
-        if(input.length() > 0 && (input[0] == 'y' || input[0] == 'Y')) {
-            std::cerr << "[warning] Breakpoint at return address of main has been removed!\n";
-            retAddrFromMain_ = nullptr;
-        }
-        else {
-            std::cout << "[debug] Aborting breakpoint removal\n";
-            return;
-        }
-    }
-
-    auto it = addrToBp_.find(address);
-    if(it != addrToBp_.end()) {
-        if(it->second.isEnabled()) {
-            it->second.disable();
-        }
-        addrToBp_.erase(address);
-    }
-    //std::cerr << "DEBUG: bp removed!\n";
-
-}
-
-void Debugger::removeBreakpoint(std::unordered_map<intptr_t, Breakpoint>::iterator it) {
-    if(retAddrFromMain_ && retAddrFromMain_ == &(it->second) && retAddrFromMain_->isEnabled()) {
-        std::cerr << "[warning] Attemping to remove breakpoint at the return address of main. "
-            "Confirm with [y/n]: ";
-        std::string input = "";
-        std::getline(std::cin, input);
-        if(input.length() > 0 && (input[0] == 'y' || input[0] == 'Y')) {
-            std::cerr << "[warning] Breakpoint at return address of main has been removed!\n";
-            retAddrFromMain_ = nullptr;
-        }
-        else {
-            std::cout << "[debug] Aborting breakpoint removal\n";
-            return;
-        }
-    }
-
-    if(it != addrToBp_.end()) {
-        if(it->second.isEnabled()) {
-            it->second.disable();
-        }
-        addrToBp_.erase(it);
-    }
-}
-
-bool Debugger::validMemoryRegionShouldStep(std::optional<dwarf::line_table::iterator> itr, bool shouldStep) {
-    auto chunk = memMap_.getChunkFromAddr(getPC());
-
-    if (chunk && (!chunk->get().isExec() || !itr)) {
-        if(shouldStep) {
-            auto c = chunk->get();
-            std::cout << "[warning] Memory Space " << MemoryMap::getNameFromPath(c.path) 
-            << " has no dwarf info, stepping through instructions instead!\n";
-            singleStepBreakpointCheck(); 
-        }
-        return false;
-    }
-    else if(exit_ && !chunk) { return false; }
-    else if(!chunk) {
-        std::cerr << "[info] PC at 0x" << std::hex << std::uppercase << getPC() 
-            << " is not in any mapped memory region. Terminating debugger session - "
-            << "Thank you for using Peek\n";
-        exit_ = true;
-        return false; 
-    }
-    return true;
-}
-
-void Debugger::stepOut() {
-    auto itr = getLineEntryFromPC(getPCOffsetAddress());
-
-    if(!validMemoryRegionShouldStep(itr, true)) return;
-    
-    auto retAddrLocation = getRegisterValue(pid_, Reg::rbp) + 8;
-    uint64_t retAddr;
-    readMemory(retAddrLocation, retAddr);
-    auto[it, inserted] = setBreakpointAtAddress(std::bit_cast<intptr_t>(retAddr));
-
-    if(it == addrToBp_.end()) {
-        std::cerr << "[warning] Step out failed, invalid return address\n";
-        return;
-    }
-    else if(!inserted) {
-        bool prevEnabled = it->second.isEnabled();
-        if(!prevEnabled) it->second.enable();
-        continueExecution();
-        if(!prevEnabled) it->second.disable();
-        return;
-    }
-    continueExecution();
-    removeBreakpoint(it);
-}
+uint64_t Debugger::offsetLoadAddress(uint64_t addr) const { return addr - loadAddress_;}
+uint64_t Debugger::addLoadAddress(uint64_t addr) const { return addr + loadAddress_;}
+uint64_t Debugger::getPCOffsetAddress() const {return offsetLoadAddress(getPC());}
+pid_t Debugger::getPID() const {return pid_;}
+uint64_t Debugger::getPC() const { return getRegisterValue(pid_, Reg::rip); }
+bool Debugger::setPC(uint64_t val) { return setRegisterValue(pid_, Reg::rip, val); }
+uint8_t Debugger::getContext() const {return context_;}
+void Debugger::setContext(uint8_t context) {context_ = context;}
 
 
-void Debugger::stepIn() {       //need to preface with breakpoint on main when you know how to
-    auto pcOffset = getPCOffsetAddress();
-    auto itr = getLineEntryFromPC(pcOffset);
 
-    if(!validMemoryRegionShouldStep(itr, true)) return;
-    
-    user_regs_struct regValStruct;
-    auto success = getAllRegisterValues(pid_, regValStruct);
 
-    unsigned sourceLine = itr.value()->line;
-    while((itr = getLineEntryFromPC(pcOffset)) && itr.value()->line == sourceLine) {
-        singleStepBreakpointCheck();
-        pcOffset = getPCOffsetAddress();
-    }
-
-    if(!itr) {
-        std::cout << "[debug] Stepped into region with no dwarf info, single-stepping instead\n";
-        singleStep();  
-        //In future --> resolve end of main, check if stepin is in shared library or out of main
-        //If out of main, resort to single stepping, if in shared library:
-            //-> revert registers, then stepOver()  
-    }
-    //else printSourceAtPC();
-    //printSourceAtPC();  //handles valid iterator in memory space check
-}
-
-void Debugger::stepOver() {
-    auto pcOffset = getPCOffsetAddress();
-    auto itr = getLineEntryFromPC(pcOffset);
-
-    if(!validMemoryRegionShouldStep(itr, true)) return;
-
-    auto func = getFunctionFromPCOffset(pcOffset);
-    auto startAddr = addLoadAddress(itr.value()->address);
-
-    auto low = dwarf::at_low_pc(func);
-    auto high = dwarf::at_high_pc(func);
-    auto curr = getLineEntryFromPC(low);
-
-    if(!curr) {
-        std::cout << "[debug] Function cannot be resolved in line table. Single stepping...\n";
-        singleStepBreakpointCheck();
-        return;
-    }
-    
-
-    std::vector<std::pair<std::intptr_t, bool>> addrshouldRemove;
-
-    for(auto val = curr.value(); val->address < high; val++) {
-   // while(curr && curr.value()->address != high) {
-        auto addr = addLoadAddress(val->address);
-        if(addr == startAddr) continue; 
-        auto [it, inserted] = setBreakpointAtAddress(std::bit_cast<intptr_t>(addr));
-
-        if(it == addrToBp_.end()) continue;
-        else if(inserted) {
-            addrshouldRemove.push_back({it->first, true});
-        }
-        else if(!it->second.isEnabled()) {
-            addrshouldRemove.push_back({it->first, false});
-        }
-    }
-    
-    auto fp = getRegisterValue(pid_, Reg::rbp);
-    uint64_t retAddr;
-    readMemory(fp + 8, retAddr);
-    auto [it, inserted] = setBreakpointAtAddress(std::bit_cast<intptr_t>(retAddr));
-
-    if(it != addrToBp_.end() && inserted) {
-        addrshouldRemove.push_back({it->first, true});
-    }
-    else if(it != addrToBp_.end() && !it->second.isEnabled()) {
-        addrshouldRemove.push_back({it->first, false});
-    }
-    continueExecution();
-
-    for(auto &[addr, shouldRemove] : addrshouldRemove) {
-        //will crash if it doesn't exist, but should always exist
-        if(shouldRemove) removeBreakpoint(addr);
-        else addrToBp_.at(addr).disable();          
-    }
-}
 
 /*
     Dies cannot be stored by references as they are results of temporary objects from the iterators.
@@ -585,8 +195,6 @@ void Debugger::dumpFunctionDies() {
 }
 
 
-
-
 dwarf::die Debugger::getFunctionFromPCOffset(uint64_t pc) const {
     for(auto& [cu, offset] : functionDies_) {
         if(dwarf::die_pc_range(cu->root()).contains(pc)) {
@@ -610,11 +218,13 @@ std::optional<dwarf::line_table::iterator> Debugger::getLineEntryFromPC(uint64_t
             auto lineEntryItr = lineTable.find_address(pc);
             if(lineEntryItr != lineTable.end()) return lineEntryItr;
             //else throw std::out_of_range("Line Entry not found in table!\n");
-        }   //maybe turn to optional, need ways of distinguishing both error types
+        } 
     }
-    //throw std::out_of_range("PC not found in any line table!\n");
     return std::nullopt;
 }
+
+
+
 
 void Debugger::printSource(const std::string fileName, unsigned line, uint8_t numOfContextLines) const {
     unsigned start = (line > numOfContextLines) ? line - numOfContextLines : 1;
@@ -628,12 +238,11 @@ void Debugger::printSource(const std::string fileName, unsigned line, uint8_t nu
             + "File could not be opened! Check permisions.\n");
     }
     
-    std::string buffer = "";
-
     //calculate uniform spacing based on digits floor(log10(n)) + 1 --> number of digits in n
     const std::string spacing(static_cast<int>(log10(end)) + 1, ' ');
-    
+    std::string buffer = "";
     unsigned index = 1;
+
     for(; index < start; index++) {
         std::getline(file, buffer, '\n');
     }
@@ -668,14 +277,15 @@ void Debugger::printMemoryLocationAtPC() const {
         << "\n";
 }
 
+
+
+
 void Debugger::waitForSignal() {
     int options = 0;
     int wait_status;
     errno = 0;
-    //std::cout << "Getting ready to wait!!\n";
 
     if(waitpid(pid_, &wait_status, options) == -1) {
-        //std::cerr << "ptrace error: " << strerror(errno) << ".\n WaitPid failed!\n";
         throw std::runtime_error(std::string("[fatal] In Debugger::waitForSignal() - ")
             + "ptrace error: " + std::string(strerror(errno)) + ".\n Waitpid failed!\n");
     }
@@ -691,27 +301,18 @@ void Debugger::waitForSignal() {
         return;
     }
 
-    //std::cerr << "DEBUG: Checking memMap initialize in waitForSignal() \n";
-
     if(memMap_.initialized() && !exit_) memMap_.reload();
-
     auto signal = getSignalInfo();
-    //std::cerr << "DEBUG: Checking signal info in waitForSignal(): " << std::to_string(signal.si_signo) << "\n";
 
     switch(signal.si_signo) {
         case SIGTRAP:
-            //std::cerr << "DEBUG: handling sigtrap in waitForSignal() \n";
-
             handleSIGTRAP(signal);
-            //std::cerr << "DEBUG: Checking returnAddrFromMain in waitForSignal() \n";
 
             if(retAddrFromMain_ && getPC() == std::bit_cast<uint64_t>(retAddrFromMain_->getAddr())) {
                 cleanup();
                 //std::cerr << "DEBUG: cleanup complete! continuing...\n";
                 continueExecution();
             }
-            //std::cerr << "DEBUG: Returning from waitForSignal() \n";
-
             return;
         case SIGSEGV:
             std::cerr << "[critical] Segmentation Error: " << signal.si_signo << ", Reason: " << signal.si_code << "\n";
@@ -746,8 +347,7 @@ void Debugger::handleSIGTRAP(siginfo_t signal) {
         }
         case 0:
             return;
-        case TRAP_TRACE:
-            //std::cout << "Single-Stepping\n";
+        case TRAP_TRACE:    //single-step
             return;
     
         default:

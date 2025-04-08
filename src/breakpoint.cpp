@@ -19,16 +19,17 @@ Breakpoint::~Breakpoint() = default;
 Breakpoint::Breakpoint(const Breakpoint&) = delete;
 Breakpoint& Breakpoint::operator=(const Breakpoint&) = delete;
 
-
 bool Breakpoint::isEnabled() const {return enabled_;}     
 std::uint8_t Breakpoint::getData() const {return data_;} 
 std::intptr_t Breakpoint::getAddr() const {return addr_;}; 
 
-bool Breakpoint::enable() { //Optimize?     //fixed wrong parameters for both ptrace calls
+
+
+bool Breakpoint::enable() { //Optimize?  
     constexpr std::uint64_t int3 = 0xcc;
     auto word = ptrace(PTRACE_PEEKDATA, pid_, addr_, nullptr);
     
-    //Linux is little endian, LSB is first. 0xFF -> 0000 ...00 1111 1111
+    //Linux is little endian, LSB is first. 0xFF --> 0000 ...00 1111 1111
     data_ = static_cast<std::uint8_t>(word & mask_);
     word = (word & ~mask_) | int3;
 
@@ -44,7 +45,7 @@ bool Breakpoint::enable() { //Optimize?     //fixed wrong parameters for both pt
     return true;
 }
 
-bool Breakpoint::disable() {    //fixed wrong parameters for both ptrace calls
+bool Breakpoint::disable() { 
     auto word = ptrace(PTRACE_PEEKDATA, pid_, addr_, nullptr);  
     word = ((word & ~mask_) | data_);
 

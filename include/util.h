@@ -7,7 +7,6 @@
 #include <string_view>
 #include <optional>
 #include <utility>
-//#include <unordered_map>
 
 
 namespace util {
@@ -23,10 +22,5 @@ namespace util {
     std::vector<std::string> splitLine(const std::string &line, char delimiter);
     bool hasWhiteSpace(const std::string_view s);
 
-    std::optional<std::string> demangleSymbol(const std::string& symbol);
-
-    std::string demangledToReadable(const std::string& demangled);
-    // extern constexpr std::vector<std::pair<std::string, std::string>> verboseSTLList;
-    // extern const std::vector<std::pair<std::string, std::string>> verbosePrimativeList;
-    // extern const std::vector<std::pair<std::string, std::string>> verboseContainerList;
+    std::optional<std::string> demangleSymbol(const std::string& symbol, bool makeReadable = true);
 }

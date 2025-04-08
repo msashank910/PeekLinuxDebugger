@@ -15,6 +15,9 @@
 //Helpers 
 
 namespace util {
+    //isPrefix is declined as inline in util.h
+
+    // This is used to strip the 0x or the *0x from a breakpoint argument/hex argument
     std::string_view stripAddrPrefix(const std::string_view& s) {          
         auto res = (!s.empty() && s[0] == '*' ? s.substr(1) : s);   //removes * for relative addresses
 
@@ -24,8 +27,7 @@ namespace util {
         return res;
     }
     
-    //isPrefix is declined as inline in util.h
-    
+    // Used to parse a string of delimited arguments into a vector of string arguments (handleCommand())
     std::vector<std::string> splitLine(const std::string &line, char delimiter) {    
         std::vector<std::string> args;
         std::stringstream ss(line);
@@ -38,7 +40,26 @@ namespace util {
         return args;
     }
 
-    //Only converts if string is completely valid and num can hold value
+
+    /*
+        ValidHexStol() and ValidDecStol() are both helper functions that use std::from_chars to translate a 
+        string into a valid number in one pass. They each take two parameters - a string_view pointing to a 
+        valid set of characters and a uint64_t number that will be overwritten on success. The hex variant 
+        will assume that the string is a set of hexadecimal characters whereas the dec variant assume a set 
+        of decimal characters. For each of the functions, the referenced passed number is "safe" to use if  
+        it contains existing data, meaning that existing information/value will not be overwritten on a 
+        failure. The functions return a boolean, which can mean one of two things:
+
+        1)  Returning true means that the data that addr points to is a valid set of characters (hex or dec 
+            depending on the function called) and the reference-passed number "num" has been overwritten 
+            with the string-to-long conversion of the number.
+
+        2)  Returning false means that addr is either empty, or there is exists at least one invalid 
+            character in the data it points to that cannot be converted into a numerical value. The 
+            reference-passed uint64_t "num" is untouched and maintains its original value from when the 
+            function was called. However, if num was not assigned a value, it could have UB if accessed 
+            without checking the function return value!
+    */
     bool validHexStol(uint64_t& num, std::string_view addr) {
         uint64_t buffer;
         auto[ptr, ec] = std::from_chars(addr.data(), addr.data() + addr.size(), buffer, 16);
@@ -48,8 +69,6 @@ namespace util {
         }
         return false;
     }
-
-    //Only converts if string is completely valid and num can hold value
     bool validDecStol(uint64_t& num, std::string_view dec) {
         uint64_t buffer;
         auto[ptr, ec] = std::from_chars(dec.data(), dec.data() + dec.size(), buffer, 10);
@@ -66,23 +85,28 @@ namespace util {
     }
 
 
+
+    static std::string demangledToReadable(const std::string& demangled);
     /*
         Handle demangling of symbols below. The demangling process uses the libstdc++ ABI library in linux.
         The demangling doesn't fully result in a readable string - so I take steps to make common symbols more 
-        readable. Below is my naive approach. It is not exhaustive but allows support for additional support 
-        in the future.
+        readable. Below is my naive approach. It is not exhaustive but allows support for extensions in the 
+        future. demangleSymbol() returns an optional string. The return value can mean one of two things:
+
+        1)  A return value of null::opt indicates that the symbol cannot be demangled, and likely is either 
+            in a readable format or does not have a readable format. Either way, use symbol as is.
+
+        2)  A return value of a string indicates that the demangling was a success. The string was passed 
+            into the readable function and the verbosity was decreased as much as possible.
     */
-
-
-    std::optional<std::string> demangleSymbol(const std::string& symbol) {
+    std::optional<std::string> demangleSymbol(const std::string& symbol, bool makeReadable) {
         int status;
         std::unique_ptr<char, decltype(&free)> demangled(abi::__cxa_demangle
                 (symbol.data(), nullptr, nullptr, &status), free);
 
-        if(!demangled || status )   //implicitly casted to boolean (0 means false)
-            return std::nullopt;
-
-        //return demangled.get();
+        if(!demangled || status) return std::nullopt;  //implicitly casted to boolean (0 means false)
+        else if(!makeReadable) return demangled.get();
+        
         std::string readable = demangledToReadable(demangled.get());
         return readable;
     }
@@ -143,7 +167,7 @@ namespace util {
     4) Simplify common container types in std namespace (vector, map, etc.).
 
 */
-    std::string demangledToReadable(const std::string& demangled) {
+    static std::string demangledToReadable(const std::string& demangled) {
         std::string readable = demangled;
         //DEBUG STATEMENT
         //return readable 
@@ -260,9 +284,9 @@ namespace util {
                     }
                     /*
                     Reaching this point means three things are true: 
-                        1) Index is at a comma --> seperation between template args
+                        1) Index is at a comma --> separation between template args
                         2) openAngleCount = 1 --> not in a sub-template arg
-                        3) Necessary template args have been iterated through
+                        3) templateArgCount == currArg --> necessary template args have been iterated through
                     
                     This means we can begin deletion length below.
                     */
