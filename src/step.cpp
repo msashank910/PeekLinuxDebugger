@@ -34,12 +34,12 @@ void Debugger::singleStepBreakpointCheck() {
     auto addr = std::bit_cast<intptr_t>(getPC());
     auto it = addrToBp_.find(addr);
     
-    /*if(retAddrFromMain_ && it != addrToBp_.end() && retAddrFromMain_ == &(it->second)) {    //time to exit! 
+    if(retAddrFromMain_ && it != addrToBp_.end() && retAddrFromMain_ == &(it->second)) {    //time to exit! 
         cleanup();
         continueExecution();
         return;
     }
-    else */if(it == addrToBp_.end()) {
+    else if(it == addrToBp_.end()) {
         singleStep();
         return;
     }
@@ -60,10 +60,14 @@ void Debugger::stepOverBreakpoint() {
 }
 
 
+
+
+
+
 bool Debugger::validMemoryRegionShouldStep(std::optional<dwarf::line_table::iterator> itr, bool shouldStep) {
     auto chunk = memMap_.getChunkFromAddr(getPC());
 
-    if (chunk && (!chunk->get().isExec() || !itr)) {
+    if (chunk && (!chunk->get().isPathtypeExec() || !itr)) {
         if(shouldStep) {
             auto c = chunk->get();
             std::cout << "[warning] Memory Space " << MemoryMap::getNameFromPath(c.path) 
@@ -81,6 +85,68 @@ bool Debugger::validMemoryRegionShouldStep(std::optional<dwarf::line_table::iter
         return false; 
     }
     return true;
+}
+
+/*
+    Read and write stackSnapshot() functions each take a reference to a vector stack of type 
+    std::pair<uint64_t, bool>. The first value in the pair represents the memory at the stack location 
+    and the second value represents if the read/write was a success. For the read function, the stack 
+    vector is passed in as an empty vector (or overwritten if there was a value there) and populated 
+    through readMemory() calls at rsp offsets. Likewise, the write memory takes a populated vector and 
+    writes to memory each index 'i' to its respective rsp offset via the formula:
+
+    stack[i].address = rsp + 8*(i+1). 
+
+    The boolean at each index is populated by the return value of chunk.isReadable() and chunk.isWriteable(). 
+    If an index wasn't read, readStackSnapshot() will return false and set each index not read to {0, false}. 
+    If an index couldn't be written, writeStackSnapShot() will return a false and set the boolean of each 
+    unwritten index to false. Note: an unread index will not necessarily fail writeStackSnapshot() as it will 
+    ignore values already false.
+*/
+bool Debugger::readStackSnapshot(std::vector<std::pair<uint64_t, bool>>& stack, size_t bytes) {
+    std::vector<std::pair<uint64_t, bool>> tempStack;
+    size_t elements = bytes/8;
+    tempStack.reserve(elements);
+    uint64_t rspOffset = getRegisterValue(pid_, Reg::rsp);
+    bool everyReadSucceeded = true;
+
+    for(size_t i = 0; i < elements; i++) {
+        rspOffset += 8;
+        auto chunk = memMap_.getChunkFromAddr(rspOffset);
+        if(chunk && chunk.value().get().canRead()) {
+            uint64_t data;
+            readMemory(rspOffset, data);
+            tempStack[i] = {data, true};
+        }
+        else {
+            tempStack[i] = {0, false};
+            everyReadSucceeded = false;
+        }
+    }
+    stack = tempStack;
+    return everyReadSucceeded;
+}
+
+//bytes are not really needed, can be used for stack.size() vs bytes messages
+bool Debugger::writeStackSnapshot(std::vector<std::pair<uint64_t, bool>>& stack, size_t bytes) {
+    bool everyWriteSucceeded = true;
+    uint64_t rspOffset = getRegisterValue(pid_, Reg::rsp);
+    
+    for(auto&[data, successfulRead] : stack) {
+        rspOffset += 8;
+        auto chunk = memMap_.getChunkFromAddr(rspOffset);
+        if(successfulRead) {
+            if(chunk && chunk.value().get().canWrite()) {
+                writeMemory(rspOffset, data);
+            }
+            else {  //function only fails when cannot write to a read place
+                successfulRead = false;
+                everyWriteSucceeded = false;
+            }
+        }
+        //no failure is marked for not writing to an unread area
+    }
+    return everyWriteSucceeded;
 }
 
 
@@ -119,8 +185,11 @@ void Debugger::stepIn() {       //need to preface with breakpoint on main when y
 
     if(!validMemoryRegionShouldStep(itr, true)) return;
     
-    user_regs_struct regValStruct;
-    auto success = getAllRegisterValues(pid_, regValStruct);
+    user_regs_struct regs;
+    std::vector<std::pair<uint64_t, bool>> stack;
+    bool readRegs = getAllRegisterValues(pid_, regs);
+    bool readStack = readStackSnapshot(stack);
+
 
     unsigned sourceLine = itr.value()->line;
     while((itr = getLineEntryFromPC(pcOffset)) && itr.value()->line == sourceLine) {
@@ -128,15 +197,49 @@ void Debugger::stepIn() {       //need to preface with breakpoint on main when y
         pcOffset = getPCOffsetAddress();
     }
 
-    if(!itr) {
-        std::cout << "[debug] Stepped into region with no dwarf info, single-stepping instead\n";
-        singleStep();  
+    bool revertState = false;
+    bool revertRegs = false;
+    if(!itr && !exit_) {
+        std::cout << "[debug] Entered region with no DWARF info. Revert state and step-over? [y/n]: ";
+        std::string response = "";
+        std::getline(std::cin, response);
+        revertState = (response.length() > 0 && (response[0] == 'y' || response[0] == 'Y'));
+    }
+
+    if(revertState && readRegs && (revertRegs = setAllRegisterValues(pid_, regs))) {
+        std::cout << "[debug] Reverting memory state and stepping over...\n";
+        if(!readStack) {
+            for(size_t i = 0; i < stack.size(); i++) {
+                if(!stack[i].second) {
+                    std::cerr << "[warning] Address at 0x" << std::hex << std::uppercase
+                        << (regs.rsp + 8 * (i+1)) << " was not read!\n";
+                }
+            }
+        }
+        
+        bool wroteToStack = writeStackSnapshot(stack);
+        if(!wroteToStack) {
+            for(size_t i = 0; i < stack.size(); i++) {
+                if(!stack[i].second) {
+                    std::cerr << "[warning] Address at 0x" << std::hex << std::uppercase
+                        << (regs.rsp + 8 * (i+1)) << " was not written!\n";
+                }
+            }
+        }
+        stepOver();
+        //singleStep();  
         //In future --> resolve end of main, check if stepin is in shared library or out of main
         //If out of main, resort to single stepping, if in shared library:
             //-> revert registers, then stepOver()  
     }
-    //else printSourceAtPC();
-    //printSourceAtPC();  //handles valid iterator in memory space check
+    else if (revertState && !revertRegs) {
+        std::cout << "[critical] Registers were not restored properly, proceed with caution." 
+            "Cannot step-over memory region with no DWARF info.\n";
+    }
+    else if (revertState) {
+        std::cout << "[warning] Registers could not be restored! Cannot step-over memory region with no DWARF"
+            " info.\n";
+    }
 }
 
 

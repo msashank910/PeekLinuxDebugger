@@ -11,7 +11,6 @@
 #include <iostream>
 #include <unordered_map>
 #include <fstream>
-// #include <filesystem>
 #include <sys/ptrace.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -86,7 +85,7 @@ void Debugger::initializeMapsAndLoadAddress() {
         uint64_t foundLoadAddress = UINT64_MAX;
 
         for(auto& chunk : memMap_.getChunks()) {
-            if(chunk.isExec()) {
+            if(chunk.isPathtypeExec()) {
                 foundLoadAddress = std::min(chunk.addrLow, foundLoadAddress);
             }
         }

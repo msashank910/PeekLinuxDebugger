@@ -24,7 +24,7 @@ using util::validDecStol;
 /*
     Below are all the Debugger class member functions that involve breakpoints. This is not to be confused 
     with breakpoint.cpp, which deals with the breakpoint class. These member functions handle setting and 
-    removing breakpoints in a debugger instance
+    removing breakpoints in a debugger instance.
 */
 
 std::pair<std::unordered_map<intptr_t, Breakpoint>::iterator, bool>
@@ -32,7 +32,7 @@ std::pair<std::unordered_map<intptr_t, Breakpoint>::iterator, bool>
     
     //First check if it is within an executable memory region or in main process memory space
     auto chunk = memMap_.getChunkFromAddr(address);
-    if(!chunk || !(MemoryMap::canExecute(chunk.value().get()) || chunk.value().get().isExec())) {
+    if(!chunk || !((chunk.value().get().canExecute()) || chunk.value().get().isPathtypeExec())) {
         std::cerr << "[error] Invalid Memory Address!";
         return {addrToBp_.end(), false};
     }

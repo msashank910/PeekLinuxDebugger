@@ -51,8 +51,8 @@ class Debugger {
     void singleStep();
     void singleStepBreakpointCheck();
     bool validMemoryRegionShouldStep(std::optional<dwarf::line_table::iterator> itr, bool shouldStep);
-    bool readStackSnapshot(std::vector<uint64_t>& stack, size_t bytes = 64);
-    bool writeStackSnapshot(std::vector<uint64_t>& stack, size_t bytes = 64);
+    bool readStackSnapshot(std::vector<std::pair<uint64_t, bool>>& stack, size_t bytes = 64);
+    bool writeStackSnapshot(std::vector<std::pair<uint64_t, bool>>& stack, size_t bytes = 64);
     void stepIn();
     void stepOut();
     void stepOver();
