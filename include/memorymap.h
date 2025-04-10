@@ -14,7 +14,14 @@ class MemoryMap {
 public: 
     MemoryMap();    //default until actually constructed in initializeMemoryMapAndLoadAddress()
     MemoryMap(pid_t pid_, const std::string& pathToExecutable);
-    MemoryMap& operator=(const MemoryMap& other);
+
+    MemoryMap(MemoryMap&&);
+    MemoryMap& operator=(MemoryMap&&);
+    ~MemoryMap();
+
+    MemoryMap(const MemoryMap&);
+    MemoryMap& operator=(const MemoryMap&);
+    
     void reload();
     //parseProcPidMaps()
     
@@ -48,28 +55,36 @@ public:
         bool shared;
     };
 
-    struct MemoryChunk {
-        uint64_t addrLow;
-        uint64_t addrHigh;
+    struct Chunk {
+        uint64_t addrLow;   //inclusive
+        uint64_t addrHigh;  //non-inclusive
         Permissions perms;
         Path path;
         std::string pathname;
        // const std::string pathSuffix;     //can be empty if path type has no suffix
         //suffix/tid may be needed later 
-        bool isExec() const;
+        bool isPathtypeExec() const; 
+        bool contains(uint64_t addr) const;     //return if addr in range [addrLow, addrHigh)
+
+        bool canRead() const;
+        bool canWrite() const;
+        bool canExecute() const;
     };
 
 
-    static bool canRead(MemoryChunk c);
-    static bool canWrite(MemoryChunk c);
-    static bool canExecute(MemoryChunk c);
-    static bool isShared(MemoryChunk c);
-    static std::string getFileNameFromChunk(MemoryChunk c);
+    // static bool canRead(Chunk& c);
+    // static bool canWrite(Chunk& c);
+    // static bool canExecute(Chunk& c);
+    // static bool isShared(Chunk& c);
+    static std::string getFileNameFromChunk(Chunk c);
     
-    const std::vector<MemoryChunk>& getChunks() const;
+    const std::vector<Chunk>& getChunks() const;
     void printChunk(uint64_t pc) const;
     void dumpChunks() const;
-    std::optional<std::reference_wrapper<const MemoryChunk>> getChunkFromAddr(uint64_t addr) const;
+
+    std::optional<std::reference_wrapper<const Chunk>> getChunkFromAddr(uint64_t addr) const;
+    bool canRead(uint64_t addr);
+    bool canWrite(uint64_t addr);
 
     bool initialized() const;
 
@@ -77,7 +92,7 @@ private:
     //may need to incorporate mutex --> look into lock_guard for RAII
     pid_t pid_;
     std::string exec_;
-    std::vector<MemoryChunk> chunks_;
+    std::vector<Chunk> chunks_;
 
     Path getPathFromFullPathname(std::string_view s) const;
 };

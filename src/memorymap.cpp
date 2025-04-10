@@ -30,10 +30,13 @@ const std::array<MemoryMap::PathDescriptor, 10> MemoryMap::pathDescriptorList {{
 }};
 
 
-bool MemoryMap::MemoryChunk::isExec() const { return path == Path::exec; }
+bool MemoryMap::Chunk::isPathtypeExec() const { return path == Path::exec; }
+bool MemoryMap::Chunk::contains(uint64_t addr) const { return (addrLow <= addr) && (addr < addrHigh); }
+bool MemoryMap::Chunk::canRead() const { return perms.read; }
+bool MemoryMap::Chunk::canWrite() const { return perms.write; }
+bool MemoryMap::Chunk::canExecute() const { return perms.execute; }
 
-MemoryMap::MemoryMap() : pid_(0), exec_("") {}
-
+MemoryMap::MemoryMap() = default;
 MemoryMap::MemoryMap(pid_t pid, const std::string& pathToExectuable) : pid_ (pid), exec_(pathToExectuable) {
     std::ifstream file;
     file.open("/proc/" + std::to_string(pid) + "/maps");
@@ -73,27 +76,23 @@ MemoryMap::MemoryMap(pid_t pid, const std::string& pathToExectuable) : pid_ (pid
         pathname = std::string(view);
         path = getPathFromFullPathname(view);
         Permissions perms(read, write, execute, shared);
-        chunks_.emplace_back(MemoryChunk(low, high, perms, path, pathname)); //fix suffix logic
+        chunks_.emplace_back(Chunk(low, high, perms, path, pathname)); //fix suffix logic
     }
 
-}
+    file.close();
 
-MemoryMap& MemoryMap::operator=(const MemoryMap& other) {
-    if(this != &other) {
-        this->pid_ = other.pid_;
-        this->exec_ = other.exec_;
-        this->chunks_ = other.chunks_;
-    }
-    return *this;
 }
 
 
-const std::vector<MemoryMap::MemoryChunk>& MemoryMap::getChunks() const {
-    return chunks_;
-}
+MemoryMap::MemoryMap(MemoryMap&&) = default;
+MemoryMap& MemoryMap::operator=(MemoryMap&&) = default;
+MemoryMap::~MemoryMap() = default;
+
+MemoryMap::MemoryMap(const MemoryMap&) = delete;
+MemoryMap& MemoryMap::operator=(const MemoryMap&) = delete;
 
 
- MemoryMap::Path MemoryMap::getPathFromFullPathname(std::string_view pathname) const {
+MemoryMap::Path MemoryMap::getPathFromFullPathname(std::string_view pathname) const {
     if(pathname[0] == '/') {
         auto sharedLibraryCheck = pathname.find(".so");
         if(sharedLibraryCheck != std::string_view::npos) {
@@ -125,8 +124,11 @@ const std::vector<MemoryMap::MemoryChunk>& MemoryMap::getChunks() const {
 
 void MemoryMap::reload() {
     MemoryMap newMM(pid_, exec_);
-    
-    chunks_ = newMM.chunks_;
+    chunks_ = std::move(newMM.chunks_);
+}
+
+const std::vector<MemoryMap::Chunk>& MemoryMap::getChunks() const {
+    return chunks_;
 }
 
 std::string MemoryMap::getNameFromPath(Path p) {
@@ -144,13 +146,8 @@ std::string MemoryMap::getNameFromPath(Path p) {
     return res->name;
 }
 
-bool MemoryMap::canRead(MemoryChunk c) {return c.perms.read;}
-bool MemoryMap::canWrite(MemoryChunk c) {return c.perms.write;}
-bool MemoryMap::canExecute(MemoryChunk c) {return c.perms.execute;}
-bool MemoryMap::isShared(MemoryChunk c) {return c.perms.shared;}
 
-
-std::string MemoryMap::getFileNameFromChunk(MemoryChunk c) {
+std::string MemoryMap::getFileNameFromChunk(Chunk c) {
     if(c.path == Path::exec || c.path == Path::so || c.path == Path::mmap) {
         std::filesystem::path p(c.pathname);
         //std::cout << "[test] Pathname from filesystem path: " << c.pathname << "\n";
@@ -216,14 +213,9 @@ void MemoryMap::dumpChunks() const {
     }
 }
 
-std::optional<std::reference_wrapper<const MemoryMap::MemoryChunk>>MemoryMap::getChunkFromAddr(uint64_t addr) const {
+std::optional<std::reference_wrapper<const MemoryMap::Chunk>>MemoryMap::getChunkFromAddr(uint64_t addr) const {
     for(const auto& c : chunks_) {
-        auto low = c.addrLow;
-        auto high = c.addrHigh;
-        
-        if(addr >= low && addr <= high ) {
-            return std::reference_wrapper<const MemoryChunk>(c);
-        }
+        if(c.contains(addr)) return c;
     }
     return std::nullopt;
 }
