@@ -9,7 +9,7 @@ Features (Implemented)
 - Inspecting registers
 - Inspecting memory-mapped spaces
 - Memory manipulation
-- Single-Step
+- Single-stepping instructions
 - Source-Level stepping
 - Source-level breakpoints
 - Symbol resolution
