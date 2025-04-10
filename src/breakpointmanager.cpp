@@ -81,56 +81,68 @@ std::pair<std::unordered_map<intptr_t, Breakpoint>::iterator, bool>
 }
 
 /* Handle Duplicate function names. Takes in a const ref to a vector of dies. */
-std::optional<intptr_t>Debugger::handleDuplicateFunctionNames(
-    const std::string_view name, const std::vector<dwarf::die>& functions)  {
-   if(functions.empty()) return std::nullopt;
-   else if(functions.size() == 1) {
-       auto low = dwarf::at_low_pc(functions[0]);
-       auto lineEntryItr = getLineEntryFromPC(low);
-       if(!lineEntryItr) {
-           throw std::logic_error("[fatal] In Debugger::setBreakpointAtFunctionName() - "
-               "function definition with low pc does not have valid line entry\n");
-       }
-       auto entry = lineEntryItr.value();
-       auto addr = (++entry)->address;
-       return std::bit_cast<intptr_t>(addLoadAddress(addr));
-   }
+std::optional<intptr_t>Debugger::handleDuplicateFunctionNames(const std::string_view name, 
+     const std::vector<dwarf::die>& functions) {
+       
+    if(functions.empty()) return std::nullopt;
+    else if(functions.size() == 1) {
+        auto low = dwarf::at_low_pc(functions[0]);
+        auto lineEntryItr = getLineEntryFromPC(low);
+        if(!lineEntryItr) {
+            throw std::logic_error("[fatal] In Debugger::setBreakpointAtFunctionName() - "
+                "function definition with low pc does not have valid line entry\n");
+        }
+        auto entry = lineEntryItr.value();
+        auto addr = (++entry)->address;
+        return std::bit_cast<intptr_t>(addLoadAddress(addr));
+    }
 
-   auto funcLocation = [] (dwarf::line_table::iterator& it) {
-       std::filesystem::path path(it->file->path);
-       std::string location = path.filename().string() + ":" + std::to_string(it->line);
-       return location;
-   };
+    auto funcLocation = [] (dwarf::line_table::iterator& it) {
+        std::filesystem::path path(it->file->path);
+        std::string location = path.filename().string() + ":" + std::to_string(it->line);
+        return location;
+    };
 
-   std::cout << "\n[info] Multiple matches found for '" << name << "':\n";
-   int count = 0;
-   for(const auto& die : functions) {
-       // auto& die = dieRef.get();
-       auto low = dwarf::at_low_pc(die);
-       auto lineEntryItr = getLineEntryFromPC(low);
-       if(!lineEntryItr) {
-           throw std::logic_error("[fatal] In Debugger::setBreakpointAtFunctionName() - "
-               "function definition with low pc does not have valid line entry\n");
-       }
-       auto entry = lineEntryItr.value();
-       std::cout << std::dec << "\t[" << count++ << "] " << dwarf::at_name(die)
-           << " at " << funcLocation(entry) << "\n";
-   }
+    std::cout << "\n[info] Multiple matches found for '" << name << "':\n";
+    int count = 0;
+    auto symbols = symMap_.getSymbolListFromName(std::string(name), false);
+    for(const auto& die : functions) {
+        // auto& die = dieRef.get();
+        auto low = dwarf::at_low_pc(die);
+        auto lineEntryItr = getLineEntryFromPC(low);
+        std::string fullName = "";
+        for(auto symbol : symbols) {    //resolve the symbol name of the function (with parameters)
+            if(symbol.addr == low && symbol.s == SymbolMap::Sym::func) {
+                fullName = symbol.name;
+                break;
+            }
+        }
+        if(!lineEntryItr) {
+            throw std::logic_error("[fatal] In Debugger::setBreakpointAtFunctionName() - "
+                "function definition with low pc does not have valid line entry\n");
+        }
+        auto entry = lineEntryItr.value();
+        //if symbol name could not be found, just use die's name
+        if(fullName.length() == 0) fullName = dwarf::at_name(die);
 
-   std::cout << "\n[info] Select one to set a breakpoint (or abort): ";
-   std::string selection;
-   std::cin >> selection;
-   count = 0;
-   uint64_t index;
+        std::cout << std::dec << "\t[" << count++ << "] " << fullName
+            << " at " << funcLocation(entry) << "\n";
+    }
 
-   if(validDecStol(index, selection) && index < functions.size()) {
-       auto& die = functions[index];
-       auto lineEntry = getLineEntryFromPC(dwarf::at_low_pc(die));
-       auto addr = (++(lineEntry.value()))->address;
-       //std::cout << "\n";
-       return std::bit_cast<intptr_t>(addLoadAddress(addr));
-   }
-   return std::nullopt;
+    std::cout << "\n[info] Select one to set a breakpoint (or abort): ";
+    std::string selection;
+    std::cin >> selection;
+    count = 0;
+    uint64_t index;
+
+    if(validDecStol(index, selection) && index < functions.size()) {
+        auto& die = functions[index];
+        auto lineEntry = getLineEntryFromPC(dwarf::at_low_pc(die));
+        auto addr = (++(lineEntry.value()))->address;
+        //std::cout << "\n";
+        return std::bit_cast<intptr_t>(addLoadAddress(addr));
+    }
+    return std::nullopt;
 }
 
 

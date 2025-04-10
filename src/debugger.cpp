@@ -114,7 +114,7 @@ void Debugger::cleanup() {
     // memMap_.dumpChunks();
     // symMap_.dumpSymbolCache();
 
-    std::cout << "[debug] Cleanup has been completed. Press [Enter] to exit the debugger. ";
+    std::cout << "[info] Cleanup has been completed. Press [Enter] to exit the debugger. ";
     std::string debugString;
     std::getline(std::cin, debugString);
     //detach from process
@@ -194,7 +194,7 @@ void Debugger::dumpFunctionDies() {
 }
 
 
-dwarf::die Debugger::getFunctionFromPCOffset(uint64_t pc) const {
+std::optional<dwarf::die> Debugger::getFunctionFromPCOffset(uint64_t pc) const {
     for(auto& [cu, offset] : functionDies_) {
         if(dwarf::die_pc_range(cu->root()).contains(pc)) {
             int count = 0;
@@ -206,8 +206,9 @@ dwarf::die Debugger::getFunctionFromPCOffset(uint64_t pc) const {
             }
         }
     }
-    throw std::out_of_range(std::string("\n[fatal] In Debugger::getFunctionFromPCOffset() - ") 
-        + "Function not found for pc. Something is definitely wrong!\n");
+    return std::nullopt;
+    // throw std::out_of_range(std::string("\n[fatal] In Debugger::getFunctionFromPCOffset() - ") 
+    //     + "Function not found for pc. Something is definitely wrong!\n");
 }
 
 std::optional<dwarf::line_table::iterator> Debugger::getLineEntryFromPC(uint64_t pc) const {
@@ -308,6 +309,8 @@ void Debugger::waitForSignal() {
             handleSIGTRAP(signal);
 
             if(retAddrFromMain_ && getPC() == std::bit_cast<uint64_t>(retAddrFromMain_->getAddr())) {
+                std::cout << "[debug] In Debugger::waitForSignal() - Main return Breakpoint hit!\n"
+                    "[debug] Preparing to cleanup and exit...\n";
                 cleanup();
                 //std::cerr << "DEBUG: cleanup complete! continuing...\n";
                 continueExecution();

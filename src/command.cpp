@@ -404,6 +404,7 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
         }
     }
     else if(argv[0] == "program_counter" || argv[0] == "pc") {
+        printSourceAtPC();
         printMemoryLocationAtPC();
     }
     else if(isPrefix(argv[0], "chunk")) {

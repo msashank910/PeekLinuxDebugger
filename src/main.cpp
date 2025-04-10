@@ -32,7 +32,7 @@ int main(int argc, char* argv[]) {
         personality(ADDR_NO_RANDOMIZE);
         execl(progName, progName, nullptr); //second arg declares name as ./prog
         
-        std::cerr << "[fatal] The debuggee argument is invalid:" << strerror(errno) << "\n";
+        std::cerr << "[fatal] The debuggee argument is invalid: " << strerror(errno) << "\n";
         //perror("The debuggee argument is invalid");
         return 1;
         

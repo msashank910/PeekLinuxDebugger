@@ -86,7 +86,7 @@ class Debugger {
     std::optional<intptr_t> handleDuplicateFilenames(const std::string_view filepath, 
         const std::vector<std::pair<std::string, intptr_t>>& fpAndAddr);
 
-    dwarf::die getFunctionFromPCOffset(uint64_t pc) const;
+    std::optional<dwarf::die> getFunctionFromPCOffset(uint64_t pc) const;
     std::optional<dwarf::line_table::iterator> getLineEntryFromPC(uint64_t pc) const;
 
     void printSource(const std::string fileName, const unsigned line, const uint8_t numOfContextLines) const;

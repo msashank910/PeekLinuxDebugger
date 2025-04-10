@@ -35,6 +35,8 @@ void Debugger::singleStepBreakpointCheck() {
     auto it = addrToBp_.find(addr);
     
     if(retAddrFromMain_ && it != addrToBp_.end() && retAddrFromMain_ == &(it->second)) {    //time to exit! 
+        std::cout << "[debug] In Debugger::singleStepBreakpointCheck() - Main return Breakpoint hit!\n"
+            "[debug] Preparing to cleanup and exit...\n";
         cleanup();
         continueExecution();
         return;
@@ -155,8 +157,9 @@ bool Debugger::writeStackSnapshot(std::vector<std::pair<uint64_t, bool>>& stack,
 
 void Debugger::stepOut() {
     auto itr = getLineEntryFromPC(getPCOffsetAddress());
-
-    if(!validMemoryRegionShouldStep(itr, true)) return;
+    if(!validMemoryRegionShouldStep(itr, false)) {
+        std::cerr << "[warning] No DWARF info found — return may not land in calling function.\n";
+    }
     
     auto retAddrLocation = getRegisterValue(pid_, Reg::rbp) + 8;
     uint64_t retAddr;
@@ -181,6 +184,7 @@ void Debugger::stepOut() {
 
 void Debugger::stepIn() {       //need to preface with breakpoint on main when you know how to
     auto pcOffset = getPCOffsetAddress();
+    auto start = pcOffset;
     auto itr = getLineEntryFromPC(pcOffset);
 
     if(!validMemoryRegionShouldStep(itr, true)) return;
@@ -189,21 +193,59 @@ void Debugger::stepIn() {       //need to preface with breakpoint on main when y
     std::vector<std::pair<uint64_t, bool>> stack;
     bool readRegs = getAllRegisterValues(pid_, regs);
     bool readStack = readStackSnapshot(stack);
-
+    auto currFunc = getFunctionFromPCOffset(pcOffset);
 
     unsigned sourceLine = itr.value()->line;
-    while((itr = getLineEntryFromPC(pcOffset)) && itr.value()->line == sourceLine) {
+    //Check if there is a line entry and if the line number has changed.
+    while((itr = getLineEntryFromPC(pcOffset)) && (itr.value()->line == sourceLine)) {
         singleStepBreakpointCheck();
         pcOffset = getPCOffsetAddress();
     }
-
+    
+    if(start == pcOffset) {
+        std::cerr << "[warning] Step-In has made no progress. Aborting function.\n";
+        return;
+    }
+    else if(itr) {
+        if(currFunc && !dwarf::die_pc_range(currFunc.value()).contains(pcOffset)) {
+            stepIn();
+            /*
+            std::cout << "[debug] Stepped into a new function. Skipping function prologue...\n";
+            auto entry = itr.value();
+            auto addr = (++entry)->address; //semantically the same as calling stepIn() here
+            auto [postPrologue, removeBp] = setBreakpointAtAddress(addLoadAddress(addr));
+            if(postPrologue == addrToBp_.end()) {
+                std::cerr << "\n[warning] Could not skip function prologue.\n";
+                return;
+            }
+            bool shouldDisable = false;
+            if(!removeBp && !postPrologue->second.isEnabled()) {
+                shouldDisable = true;
+                postPrologue->second.enable();
+            }
+            continueExecution();
+            if(removeBp) removeBreakpoint(postPrologue);
+            else if(shouldDisable) postPrologue->second.disable();
+            */
+        }
+        return;
+    }
+    //The line iterator does not exist, meaning we are in a region with no DWARF info
+    //reaching this point means that we may need to do a state reversal
     bool revertState = false;
     bool revertRegs = false;
+    auto chunk = memMap_.getChunkFromAddr(getPC());
+    auto memoryLocation = (chunk ? MemoryMap::getNameFromPath(chunk.value().get().path) : "unmapped memory");
+             
     if(!itr && !exit_) {
-        std::cout << "[debug] Entered region with no DWARF info. Revert state and step-over? [y/n]: ";
+        std::cout << "[info] Entered region with no DWARF info ("
+            << memoryLocation << "). Revert state and step-over? [y/n]: ";
         std::string response = "";
         std::getline(std::cin, response);
         revertState = (response.length() > 0 && (response[0] == 'y' || response[0] == 'Y'));
+        if(!revertState) {
+            std::cout << "[warning] Region can only be stepped through by instruction.\n";
+        }
     }
 
     if(revertState && readRegs && (revertRegs = setAllRegisterValues(pid_, regs))) {
@@ -232,8 +274,8 @@ void Debugger::stepIn() {       //need to preface with breakpoint on main when y
         //If out of main, resort to single stepping, if in shared library:
             //-> revert registers, then stepOver()  
     }
-    else if (revertState && !revertRegs) {
-        std::cout << "[critical] Registers were not restored properly, proceed with caution." 
+    else if (revertState && readRegs && !revertRegs) {
+        std::cout << "[critical] Registers were not restored properly, proceed with caution. " 
             "Cannot step-over memory region with no DWARF info.\n";
     }
     else if (revertState) {
@@ -245,30 +287,38 @@ void Debugger::stepIn() {       //need to preface with breakpoint on main when y
 
 void Debugger::stepOver() {
     auto pcOffset = getPCOffsetAddress();
-    auto itr = getLineEntryFromPC(pcOffset);
+    auto currEntry = getLineEntryFromPC(pcOffset);
 
-    if(!validMemoryRegionShouldStep(itr, true)) return;
-
+    //Return early if there is no DWARF info
+    if(!validMemoryRegionShouldStep(currEntry, true)) return;
     auto func = getFunctionFromPCOffset(pcOffset);
-    auto startAddr = addLoadAddress(itr.value()->address);
+    auto startAddr = addLoadAddress(currEntry.value()->address);
 
-    auto low = dwarf::at_low_pc(func);
-    auto high = dwarf::at_high_pc(func);
-    auto curr = getLineEntryFromPC(low);
+    //You may still have DWARF info in an invalid, non-user-defined function. This check will handle that.
+    if(!func) {
+        std::cerr << "[warning] Cannot step over line in non-user-defined function. Stepping-in instead.\n";
+        return stepIn();
+    }
 
-    if(!curr) {
+    //All code from here assumes you are in a user-defined function with DWARF info.
+    auto low = dwarf::at_low_pc(func.value());
+    auto high = dwarf::at_high_pc(func.value());
+    auto lowEntry = getLineEntryFromPC(low);
+    if(!lowEntry) {
         std::cout << "[debug] Function cannot be resolved in line table. Single stepping...\n";
         singleStepBreakpointCheck();
         return;
     }
     
-
     std::vector<std::pair<std::intptr_t, bool>> addrshouldRemove;
+    unsigned startLine = currEntry.value()->line;
 
-    for(auto val = curr.value(); val->address < high; val++) {
-   // while(curr && curr.value()->address != high) {
+    for(auto val = lowEntry.value(); val->address < high; val++) {
         auto addr = addLoadAddress(val->address);
-        if(addr == startAddr) continue; 
+        
+        //Prior to placing a bp, check if the address is the same as starting address
+        //The if-statement is appended such that stepOver() will skip the current line completely
+        if(addr == startAddr || val->line == startLine || !val->is_stmt) continue; 
         auto [it, inserted] = setBreakpointAtAddress(std::bit_cast<intptr_t>(addr));
 
         if(it == addrToBp_.end()) continue;
