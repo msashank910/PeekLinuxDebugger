@@ -38,7 +38,7 @@ Peek is a lightweight Linux debugger for 64-bit systems, built from scratch in C
     
     ./build/pld <file_path_to_debuggee_program>
 
-Note: Debugee Program must be compiled with the following flags:
+#### Note: Debugee Program must be compiled with the following flags:
 
     -g -gdwarf04
 
