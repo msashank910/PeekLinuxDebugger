@@ -42,7 +42,7 @@ Peek is a lightweight Linux debugger for 64-bit systems, built from scratch in C
 
     -g -gdwarf04
 
-You may also want to disable optimizations (-O0) for a smoother experience.
+- You may also want to disable optimizations (-O0) for a smoother experience.
 
 While in the [__p|d__] command-line interface, you can interact with the child process via breakpoints, memory manipulation, and register manipulation.
 
@@ -65,15 +65,15 @@ While in the [__p|d__] command-line interface, you can interact with the child p
 
 #### Stack Unwinding
 
-    Implement stack trace generation to unwind the stack and show function call history.
+- Implement stack trace generation to unwind the stack and show function call history.
 
 #### Handling Variables
 
-    Inspect and modify local variables and function parameters during execution.
+- Inspect and modify local variables and function parameters during execution.
 
 #### Multithreading
 
-    Be able to run multiple concurrent debugger instances with control over all of them.
+- Be able to run multiple concurrent debugger instances with control over all of them.
 
 ## 📄 License
 
