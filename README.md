@@ -1,8 +1,8 @@
-Peek - A Lightweight Linux Debugger (WIP)
+# Peek - A Lightweight Linux Debugger (WIP)
 
 Peek is a lightweight Linux debugger for 64-bit systems, built from scratch in C++. This project is currently a work in progress and aims to provide essential debugging features with a minimalistic approach. It uses Linenoise for command line editing and Libelfin for parsing ELF and DWARF debugging information.
 
-Features (Implemented)
+## Features (Implemented)
 
 - Attaching to processes
 - Setting breakpoints
@@ -15,26 +15,26 @@ Features (Implemented)
 - Symbol resolution
 
 
-Technologies Used:
+## Technologies Used:
 
     Language: C++
     Platform: Linux-x86-64 (WSL2 compatible)
     Build System: g++ / CMake
 
-📦 Installation
+## 📦 Installation
 
-Clone the repository:
+#### Clone the repository:
 
     git clone https://github.com/msashank910/Peek.git
     cd Peek
 
-Build the project:
+#### Build the project:
 
     mkdir -p build && cmake -B build . && cmake --build build
 
-🖥 Usage
+## 🖥 Usage
 
-To run the debugger:
+#### To run the debugger:
     
     ./build/pld <file_path_to_debuggee_program>
 
@@ -46,37 +46,36 @@ You may also want to disable optimizations (-O0) for a smoother experience.
 
 While in the [__p|d__] command-line interface, you can interact with the child process via breakpoints, memory manipulation, and register manipulation.
 
-For a full list of commands, use the help command (currently a WIP):
+#### For a full list of commands, use the help command (currently a WIP):
 
     help
 
-Certain commands can be executed via their prefixes or by shorthand abbreviations as well. For example:
+#### Certain commands can be executed via their prefixes or by shorthand abbreviations as well. For example:
 
     To set a breakpoint - "breakpoint", "break", or "b"
-
     To read from a register - "register_read" <register_name> or "rr" <register_name>
 
-📋 Current Limitations
+## 📋 Current Limitations
 
     No GUI (command-line only).
     Limited command support (in progress).
     Binaries must be compiled in C or C++ on x86-64 Linux
 
-🛤 Roadmap
+## 🛤 Roadmap
 
-Stack Unwinding
+#### Stack Unwinding
 
     Implement stack trace generation to unwind the stack and show function call history.
 
-Handling Variables
+#### Handling Variables
 
     Inspect and modify local variables and function parameters during execution.
 
-Multithreading
+#### Multithreading
 
     Be able to run multiple concurrent debugger instances with control over all of them.
 
-📄 License
+## 📄 License
 
 This project is licensed under the MIT License.
 
