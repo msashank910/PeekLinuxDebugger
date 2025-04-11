@@ -16,11 +16,19 @@
 #include "./symbolmap.h"
 
 class Debugger {
+    enum class Child {
+        running = 0,
+        detach = 1,
+        kill = 2,
+        crashed = 3,
+        terminated = 4
+    };
+
     pid_t pid_;
     std::string progName_;
     //bool verbose;
     uint64_t loadAddress_;
-    bool exit_;
+    Child state_;
     uint8_t context_;
     Breakpoint* retAddrFromMain_;
 

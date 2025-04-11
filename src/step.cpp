@@ -34,9 +34,10 @@ void Debugger::singleStepBreakpointCheck() {
     auto addr = std::bit_cast<intptr_t>(getPC());
     auto it = addrToBp_.find(addr);
     
+    //this if statement will never hit!
     if(retAddrFromMain_ && it != addrToBp_.end() && retAddrFromMain_ == &(it->second)) {    //time to exit! 
-        std::cout << "[debug] In Debugger::singleStepBreakpointCheck() - Main return Breakpoint hit!\n"
-            "[debug] Preparing to cleanup and exit...\n";
+        std::cout << "[debug] In Debugger::singleStepBreakpointCheck() - Main return Breakpoint hit!\n";
+            //"[debug] Preparing to cleanup and exit...\n";
         cleanup();
         continueExecution();
         return;
@@ -78,12 +79,12 @@ bool Debugger::validMemoryRegionShouldStep(std::optional<dwarf::line_table::iter
         }
         return false;
     }
-    else if(exit_ && !chunk) { return false; }
+    else if(state_ != Child::running && !chunk) { return false; }
     else if(!chunk) {
         std::cerr << "[info] PC at 0x" << std::hex << std::uppercase << getPC() 
             << " is not in any mapped memory region. Terminating debugger session - "
             << "Thank you for using Peek\n";
-        exit_ = true;
+        state_ == Child::killed;
         return false; 
     }
     return true;
@@ -112,18 +113,25 @@ bool Debugger::readStackSnapshot(std::vector<std::pair<uint64_t, bool>>& stack, 
     uint64_t rspOffset = getRegisterValue(pid_, Reg::rsp);
     bool everyReadSucceeded = true;
 
+    // std::cout << "\nTEST - readStackSnapshot()\n";
+    // std::cout << "--------------------------------------------------------\n";
+    // std::cout << "rsp = 0x" << std::hex << std::uppercase << rspOffset 
+    //     << std::endl;
+
     for(size_t i = 0; i < elements; i++) {
         rspOffset += 8;
         auto chunk = memMap_.getChunkFromAddr(rspOffset);
         if(chunk && chunk.value().get().canRead()) {
             uint64_t data;
             readMemory(rspOffset, data);
-            tempStack[i] = {data, true};
+            tempStack.push_back({data, true});
         }
         else {
-            tempStack[i] = {0, false};
+            tempStack.push_back({0, false});
             everyReadSucceeded = false;
         }
+        // std::cout << "Stack at rsp + 0x" << std::hex << std::uppercase << rspOffset << ": 0x"
+        //     << tempStack[i].first << " (was read: " << (tempStack[i].second ? "true" : "false") << ")\n";
     }
     stack = tempStack;
     return everyReadSucceeded;
@@ -133,7 +141,11 @@ bool Debugger::readStackSnapshot(std::vector<std::pair<uint64_t, bool>>& stack, 
 bool Debugger::writeStackSnapshot(std::vector<std::pair<uint64_t, bool>>& stack, size_t bytes) {
     bool everyWriteSucceeded = true;
     uint64_t rspOffset = getRegisterValue(pid_, Reg::rsp);
-    
+    // std::cout << "\nTEST - writeStackSnapshot()\n";
+    // std::cout << "--------------------------------------------------------\n";
+    // std::cout << "rsp = 0x" << std::hex << std::uppercase << rspOffset 
+    //     << std::endl;
+    // std::cout << (stack.empty() ? "[critical] STACK IS EMPTY" : "") << "\n";
     for(auto&[data, successfulRead] : stack) {
         rspOffset += 8;
         auto chunk = memMap_.getChunkFromAddr(rspOffset);
@@ -145,8 +157,11 @@ bool Debugger::writeStackSnapshot(std::vector<std::pair<uint64_t, bool>>& stack,
                 successfulRead = false;
                 everyWriteSucceeded = false;
             }
+            // std::cout << "Stack at rsp + 0x" << std::hex << std::uppercase << rspOffset << ": 0x"
+            //     << data << " (was written: " << (successfulRead ? "true" : "false") << ")\n";
         }
         //no failure is marked for not writing to an unread area
+        
     }
     return everyWriteSucceeded;
 }
@@ -162,6 +177,12 @@ void Debugger::stepOut() {
     }
     
     auto retAddrLocation = getRegisterValue(pid_, Reg::rbp) + 8;
+    auto chunk = memMap_.getChunkFromAddr(retAddrLocation);
+    if(!chunk || !chunk.value().get().canRead()) {
+        std::cerr << "[warning] Cannot step over with an invalid frame pointer or "
+            "return address. Stepping-in instead.\n";
+        return stepIn();
+    }
     uint64_t retAddr;
     readMemory(retAddrLocation, retAddr);
     auto[it, inserted] = setBreakpointAtAddress(std::bit_cast<intptr_t>(retAddr));
@@ -237,7 +258,7 @@ void Debugger::stepIn() {       //need to preface with breakpoint on main when y
     auto chunk = memMap_.getChunkFromAddr(getPC());
     auto memoryLocation = (chunk ? MemoryMap::getNameFromPath(chunk.value().get().path) : "unmapped memory");
              
-    if(!itr && !exit_) {
+    if(!itr && state_ == Child::running) {
         std::cout << "[info] Entered region with no DWARF info ("
             << memoryLocation << "). Revert state and step-over? [y/n]: ";
         std::string response = "";
@@ -293,10 +314,17 @@ void Debugger::stepOver() {
     if(!validMemoryRegionShouldStep(currEntry, true)) return;
     auto func = getFunctionFromPCOffset(pcOffset);
     auto startAddr = addLoadAddress(currEntry.value()->address);
+    auto retAddrLocation = getRegisterValue(pid_, Reg::rbp) + 8;
+    auto chunk = memMap_.getChunkFromAddr(retAddrLocation);
 
     //You may still have DWARF info in an invalid, non-user-defined function. This check will handle that.
     if(!func) {
         std::cerr << "[warning] Cannot step over line in non-user-defined function. Stepping-in instead.\n";
+        return stepIn();
+    }
+    else if(!chunk || !chunk.value().get().canRead()) {
+        std::cerr << "[warning] Cannot step over with an invalid frame pointer or "
+            "return address. Stepping-in instead.\n";
         return stepIn();
     }
 
@@ -330,9 +358,8 @@ void Debugger::stepOver() {
         }
     }
     
-    auto fp = getRegisterValue(pid_, Reg::rbp);
     uint64_t retAddr;
-    readMemory(fp + 8, retAddr);
+    readMemory(retAddrLocation, retAddr);
     auto [it, inserted] = setBreakpointAtAddress(std::bit_cast<intptr_t>(retAddr));
 
     if(it != addrToBp_.end() && inserted) {

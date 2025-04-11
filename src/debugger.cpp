@@ -1,5 +1,6 @@
 #include "../include/debugger.h"
 #include "../include/util.h"
+#include "../include/constants.h"
 #include "../include/register.h"
 #include "../include/breakpoint.h"
 #include "../include/memorymap.h"
@@ -32,11 +33,12 @@
 
 //Use reg namespace
 using namespace reg;
+using constants::STOPWAIT_SIGNAL;
 // using util::validDecStol;
 
 //Debugger Member Functions
 Debugger::Debugger(pid_t pid, std::string progName) : pid_(pid), progName_(std::move(progName)), 
-    loadAddress_(0), exit_(false), context_(2), retAddrFromMain_(nullptr) {
+    loadAddress_(0), state_(Child::running), context_(2), retAddrFromMain_(nullptr) {
     auto fd = open(progName_.c_str(), O_RDONLY);
     
     elf_ = elf::elf(elf::create_mmap_loader(fd));
@@ -265,7 +267,7 @@ void Debugger::printSourceAtPC() {
 }
 
 void Debugger::printMemoryLocationAtPC() const {
-    if(exit_ == true) return;
+    if(state_ != Child::running) return;
 
     auto pc = getPC();
     auto pcOffset = offsetLoadAddress(pc);
@@ -281,6 +283,15 @@ void Debugger::printMemoryLocationAtPC() const {
 
 
 void Debugger::waitForSignal() {
+
+    // bool 
+    // while()
+    // auto siggy = getSignalInfo();
+    // if(siggy.si_signo == STOPWAIT_SIGNAL) {
+    //     std::cout << "DEBUG : HIT STOP WAIT\n";
+    //     return;
+    // }
+
     int options = 0;
     int wait_status;
     errno = 0;
@@ -292,7 +303,7 @@ void Debugger::waitForSignal() {
 
     if(WIFEXITED(wait_status)) {
         std::cout << "\n[info] Child process has complete normally. Thank you for using Peek!" << std::endl;
-        exit_ = true;
+        state_ = Child::;
         return;
     }
     else if(WIFSIGNALED(wait_status)) {
@@ -304,30 +315,40 @@ void Debugger::waitForSignal() {
     if(memMap_.initialized() && !exit_) memMap_.reload();
     auto signal = getSignalInfo();
 
+    
     switch(signal.si_signo) {
         case SIGTRAP:
+        //std::cerr << "DEBUG : Handling SIGTRAP\n";
             handleSIGTRAP(signal);
 
-            if(retAddrFromMain_ && getPC() == std::bit_cast<uint64_t>(retAddrFromMain_->getAddr())) {
-                std::cout << "[debug] In Debugger::waitForSignal() - Main return Breakpoint hit!\n"
-                    "[debug] Preparing to cleanup and exit...\n";
-                cleanup();
+            if(retAddrFromMain_ && !exit_ && getPC() == std::bit_cast<uint64_t>(retAddrFromMain_->getAddr())) {
+                std::cout << "[debug] In Debugger::waitForSignal() - Main return Breakpoint hit!\n";
+                    //"[debug] Preparing to cleanup and exit...\n";
+                exit_ = true;
+                // cleanup();
                 //std::cerr << "DEBUG: cleanup complete! continuing...\n";
-                continueExecution();
+                // continueExecution();
             }
             return;
         case SIGSEGV:
+           // std::cerr << "DEBUG : Handling SIGSEGV\n";
             std::cerr << "[critical] Segmentation Error: " << signal.si_signo << ", Reason: " << signal.si_code << "\n";
+            //ptrace(PTRACE_CONT, pid_, nullptr, SIGSEGV);
             break;
         case SIGWINCH:
-            std::cout << "[debug] Ignoring SIGWINCH (window resize)\n";
-            return waitForSignal();
+            std::cerr << "[warning] SIGWINCH encountered when it should be ignored.\n";
+
+           // std::cout << "[debug] Ignoring SIGWINCH (window resize)\n";
+            //ptrace(PTRACE_CONT, pid_, nullptr, SIGTRAP);
+            return;
         default:
+            //std::cerr << "[DEBUG :] Handling DEFAULT\n";
             std::cerr << "[warning] Signal: " << signal.si_signo << ", Reason: " << signal.si_code << "\n";
             break;
     }
-    
-    printSourceAtPC();
+    // kill(pid_, STOPWAIT_SIGNAL);
+    // waitForSignal();
+   printSourceAtPC();
 }
 
 siginfo_t Debugger::getSignalInfo() const {

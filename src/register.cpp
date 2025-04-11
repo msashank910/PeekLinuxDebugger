@@ -130,7 +130,7 @@ namespace reg {
     */
 void Debugger::dumpRegisters() const {
     user_regs_struct rawRegVals;
-    if(getAllRegisterValues(pid_, rawRegVals)) {
+    if(!getAllRegisterValues(pid_, rawRegVals)) {
 		std::cerr << "[critical] register values could not be acquired: " << strerror(errno) << "\n";
 		return;
 	}

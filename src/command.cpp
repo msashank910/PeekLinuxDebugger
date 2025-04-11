@@ -33,11 +33,29 @@ void Debugger::run() {
 
     char* line;
     std::string prevArgs = "";
-    while(!exit_ && (line = linenoise("[__p|d__] ")) != nullptr) {
+    while(state_ == Child::running && (line = linenoise("[__p|d__] ")) != nullptr) {
         if(handleCommand(line, prevArgs)) {std::cout << std::endl;} //bool return for spacing/flushing
         linenoiseHistoryAdd(line);  //may need to initialize history
         linenoiseFree(line);
     }
+
+    bool killProcess = false;
+    if(state_ == Child::detached) {
+        std::cout << "End child process? [y/n] ";
+        std::string response = "";
+        std::getline(std::cin, response);
+        if(killProcess = (response.length() > 0 && (response[0] == 'y' || response[0] == 'Y'))) {
+            std::cerr << "[debug] Ending child process. Thank you for using Peek!\n";
+        }
+    }
+
+    if(state_ != Child::detached || killProcess) {
+        kill(pid_, SIGTRAP);
+        return;
+    }
+    cleanup();
+    std::cerr << "[debug] Cleanup complete! continuing...\n";
+    continueExecution();
 }
 
 
@@ -442,7 +460,7 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
     }
     else if(argv[0] == "q" || argv[0] == "e" || argv[0] == "exit" || argv[0] ==  "quit") {
         std::cout << "[debug] Exiting....";
-        exit_ = true;
+        state_ = Child::detached;
     }
     else {
         std::cout << "[error] Invalid Command!";
