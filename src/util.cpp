@@ -5,6 +5,8 @@
 #include <vector>
 #include <iostream>
 #include <sstream>
+#include <algorithm>
+#include <cctype>
 #include <string_view>
 #include <charconv>
 #include <optional>
@@ -82,6 +84,33 @@ namespace util {
 
     bool hasWhiteSpace(const std::string_view s) {
         return s.find_first_of(" \t") != std::string_view::npos;
+    }
+
+    void stringToLowercase(std::string& s) {
+        if(s.empty()) return;
+        std::transform(s.begin(), s.end(), s.begin(), 
+        [] (unsigned char c) {
+            return std::tolower(c);
+        });
+    }
+    
+    void stringToUppercase(std::string& s) {
+        if(s.empty()) return;
+        std::transform(s.begin(), s.end(), s.begin(), 
+        [] (unsigned char c) {
+            return std::toupper(c);
+        });
+
+        
+    }
+    
+    bool promptYesOrNo() {
+        std::string response = "";
+        std::cout << "[y/n]: ";
+        std::getline(std::cin, response);
+        stringToLowercase(response);
+
+        return (response.length() > 0 && isPrefix((response), "yes"));
     }
 
 

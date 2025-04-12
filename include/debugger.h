@@ -14,21 +14,15 @@
 #include "./breakpoint.h"
 #include "./memorymap.h"
 #include "./symbolmap.h"
+#include "./state.h"
 
 class Debugger {
-    enum class Child {
-        running = 0,
-        detach = 1,
-        kill = 2,
-        crashed = 3,
-        terminated = 4
-    };
 
     pid_t pid_;
     std::string progName_;
     //bool verbose;
     uint64_t loadAddress_;
-    Child state_;
+    state::Child state_;
     uint8_t context_;
     Breakpoint* retAddrFromMain_;
 
@@ -43,6 +37,7 @@ class Debugger {
 
     void initialize();
     bool handleCommand(const std::string& args, std::string& prevArgs);   //bool used for spacing
+    void handleChildState();
     void cleanup();
     
     std::pair<std::unordered_map<intptr_t, Breakpoint>::iterator, bool> 
@@ -65,6 +60,8 @@ class Debugger {
     void stepOut();
     void stepOver();
     void stepOverBreakpoint();
+    void skipUnsafeInstruction(const size_t bytes = 8);
+    void jumpToInstruction(const uint64_t newRip);
 
     void waitForSignal();
     void handleSIGTRAP(siginfo_t signal);

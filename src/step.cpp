@@ -1,5 +1,6 @@
 #include "../include/debugger.h"
 #include "../include/util.h"
+#include "../include/state.h"
 #include "../include/register.h"
 #include "../include/breakpoint.h"
 #include "../include/memorymap.h"
@@ -14,7 +15,8 @@
 #include <cstdint>
 
 using namespace reg;
-
+using util::promptYesOrNo;
+using namespace state;
 
 /* Below are all the Debugger class member functions that involve stepping. */
 
@@ -38,8 +40,9 @@ void Debugger::singleStepBreakpointCheck() {
     if(retAddrFromMain_ && it != addrToBp_.end() && retAddrFromMain_ == &(it->second)) {    //time to exit! 
         std::cout << "[debug] In Debugger::singleStepBreakpointCheck() - Main return Breakpoint hit!\n";
             //"[debug] Preparing to cleanup and exit...\n";
-        cleanup();
-        continueExecution();
+        // cleanup();
+        // continueExecution();
+        state_ = Child::finish;
         return;
     }
     else if(it == addrToBp_.end()) {
@@ -79,12 +82,12 @@ bool Debugger::validMemoryRegionShouldStep(std::optional<dwarf::line_table::iter
         }
         return false;
     }
-    else if(state_ != Child::running && !chunk) { return false; }
+    else if(isExecuting(state_) && !chunk) { return false; }
     else if(!chunk) {
         std::cerr << "[info] PC at 0x" << std::hex << std::uppercase << getPC() 
             << " is not in any mapped memory region. Terminating debugger session - "
             << "Thank you for using Peek\n";
-        state_ == Child::killed;
+        state_ = Child::kill;
         return false; 
     }
     return true;
@@ -203,7 +206,7 @@ void Debugger::stepOut() {
 }
 
 
-void Debugger::stepIn() {       //need to preface with breakpoint on main when you know how to
+void Debugger::stepIn() { 
     auto pcOffset = getPCOffsetAddress();
     auto start = pcOffset;
     auto itr = getLineEntryFromPC(pcOffset);
@@ -230,24 +233,6 @@ void Debugger::stepIn() {       //need to preface with breakpoint on main when y
     else if(itr) {
         if(currFunc && !dwarf::die_pc_range(currFunc.value()).contains(pcOffset)) {
             stepIn();
-            /*
-            std::cout << "[debug] Stepped into a new function. Skipping function prologue...\n";
-            auto entry = itr.value();
-            auto addr = (++entry)->address; //semantically the same as calling stepIn() here
-            auto [postPrologue, removeBp] = setBreakpointAtAddress(addLoadAddress(addr));
-            if(postPrologue == addrToBp_.end()) {
-                std::cerr << "\n[warning] Could not skip function prologue.\n";
-                return;
-            }
-            bool shouldDisable = false;
-            if(!removeBp && !postPrologue->second.isEnabled()) {
-                shouldDisable = true;
-                postPrologue->second.enable();
-            }
-            continueExecution();
-            if(removeBp) removeBreakpoint(postPrologue);
-            else if(shouldDisable) postPrologue->second.disable();
-            */
         }
         return;
     }
@@ -258,13 +243,10 @@ void Debugger::stepIn() {       //need to preface with breakpoint on main when y
     auto chunk = memMap_.getChunkFromAddr(getPC());
     auto memoryLocation = (chunk ? MemoryMap::getNameFromPath(chunk.value().get().path) : "unmapped memory");
              
-    if(!itr && state_ == Child::running) {
+    if(!itr && isExecuting(state_)) {
         std::cout << "[info] Entered region with no DWARF info ("
-            << memoryLocation << "). Revert state and step-over? [y/n]: ";
-        std::string response = "";
-        std::getline(std::cin, response);
-        revertState = (response.length() > 0 && (response[0] == 'y' || response[0] == 'Y'));
-        if(!revertState) {
+            << memoryLocation << "). Revert state and step-over? ";
+        if(promptYesOrNo()) {
             std::cout << "[warning] Region can only be stepped through by instruction.\n";
         }
     }
@@ -375,4 +357,75 @@ void Debugger::stepOver() {
         if(shouldRemove) removeBreakpoint(addr);
         else addrToBp_.at(addr).disable();          
     }
+}
+
+
+
+
+
+
+void Debugger::skipUnsafeInstruction(const size_t bytes) {
+    auto rip = getRegisterValue(pid_, Reg::rip);
+    auto newRip = rip + static_cast<uint64_t>(bytes);
+
+    if(!setRegisterValue(pid_, Reg::rip, newRip)) {
+        std::cerr << "[warning] RIP was not set properly\n";
+        return;
+    }
+    else if(uint64_t setRip = getRegisterValue(pid_, Reg::rip); setRip != newRip) {
+        std::cerr << "[critical] Read RIP does not match with set RIP (0x"
+            << std::uppercase << std::hex << setRip << "). Proceed with caution.\n";
+    }
+
+    auto ripChunk = memMap_.getChunkFromAddr(rip);
+    auto newRipChunk = memMap_.getChunkFromAddr(newRip);
+    std::string ripChunkMem = "Unmapped Memory";
+    std::string newRipChunkMem = "Unmapped Memory";
+
+    if(ripChunk) {
+        ripChunkMem = MemoryMap::getNameFromPath(ripChunk.value().get().path);
+    }
+    if(newRipChunk) {
+        newRipChunkMem = MemoryMap::getNameFromPath(newRipChunk.value().get().path);
+    }
+
+    std::cout << "[debug] Rip has been set 0x" << std::hex << std::uppercase << rip
+        << " (0x" << offsetLoadAddress(rip) << ") --> 0x" << (newRip) 
+        << " (0x" << offsetLoadAddress(newRip) << ")\n"
+        << "[debug] " << ripChunkMem << " --> " << newRipChunkMem << "\n";
+}
+
+
+void Debugger::jumpToInstruction(const uint64_t newRip) {
+    auto rip = getRegisterValue(pid_, Reg::rip);
+
+    if(!setRegisterValue(pid_, Reg::rip, newRip)) {
+        std::cerr << "[warning] RIP was not set properly\n";
+        return;
+    }
+    else if(uint64_t setRip = getRegisterValue(pid_, Reg::rip); setRip != newRip) {
+        std::cerr << "[critical] Read RIP does not match with set RIP (0x"
+            << std::uppercase << std::hex << setRip << "). Proceed with caution.\n";
+    }
+
+    auto ripChunk = memMap_.getChunkFromAddr(rip);
+    auto newRipChunk = memMap_.getChunkFromAddr(newRip);
+    std::string ripChunkMem = "Unmapped Memory";
+    std::string newRipChunkMem = "";
+
+    if(ripChunk) {
+        ripChunkMem = MemoryMap::getNameFromPath(ripChunk.value().get().path);
+    }
+    if(newRipChunk) {
+        newRipChunkMem = MemoryMap::getNameFromPath(newRipChunk.value().get().path);
+    }
+    else {
+        std::cerr << "[warning] Cannot jump to unmapped memory.";
+        return;
+    }
+
+    std::cout << "[debug] Rip has been set 0x" << std::hex << std::uppercase << rip
+        << " (0x" << offsetLoadAddress(rip) << ") --> 0x" << (newRip) 
+        << " (0x" << offsetLoadAddress(newRip) << ")\n"
+        << "[debug] " << ripChunkMem << " --> " << newRipChunkMem << "\n";
 }

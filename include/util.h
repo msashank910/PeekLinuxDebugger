@@ -22,5 +22,9 @@ namespace util {
     std::vector<std::string> splitLine(const std::string &line, char delimiter);
     bool hasWhiteSpace(const std::string_view s);
 
+    void stringToLowercase(std::string& s);
+    void stringToUppercase(std::string& s);
+    bool promptYesOrNo();
+
     std::optional<std::string> demangleSymbol(const std::string& symbol, bool makeReadable = true);
 }

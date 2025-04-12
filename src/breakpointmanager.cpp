@@ -19,7 +19,7 @@
 
 
 using util::validDecStol;
-
+using util::promptYesOrNo;
 
 /*
     Below are all the Debugger class member functions that involve breakpoints. This is not to be confused 
@@ -212,10 +212,12 @@ std::optional<intptr_t>Debugger::handleDuplicateFilenames( const std::string_vie
 void Debugger::removeBreakpoint(intptr_t address) {
     if(retAddrFromMain_ && retAddrFromMain_->getAddr() == address && retAddrFromMain_->isEnabled()) {
         std::cerr << "[warning] Attemping to remove breakpoint at the return address of main. "
-            "Confirm with [y/n]: ";
-        std::string input = "";
-        std::getline(std::cin, input);
-        if(input.length() > 0 && (input[0] == 'y' || input[0] == 'Y')) {
+            "Continue? ";
+        //    "Confirm with [y/n]: ";
+        // std::string input = "";
+        // std::getline(std::cin, input);
+        // if(input.length() > 0 && (input[0] == 'y' || input[0] == 'Y')) {
+        if(promptYesOrNo()) {
             std::cerr << "[warning] Breakpoint at return address of main has been removed!\n";
             retAddrFromMain_ = nullptr;
         }
@@ -239,10 +241,12 @@ void Debugger::removeBreakpoint(intptr_t address) {
 void Debugger::removeBreakpoint(std::unordered_map<intptr_t, Breakpoint>::iterator it) {
     if(retAddrFromMain_ && retAddrFromMain_ == &(it->second) && retAddrFromMain_->isEnabled()) {
         std::cerr << "[warning] Attemping to remove breakpoint at the return address of main. "
-            "Confirm with [y/n]: ";
-        std::string input = "";
-        std::getline(std::cin, input);
-        if(input.length() > 0 && (input[0] == 'y' || input[0] == 'Y')) {
+            "Continue? ";
+            //"Confirm with [y/n]: ";
+        // std::string input = "";
+        // std::getline(std::cin, input);
+        //if(input.length() > 0 && (input[0] == 'y' || input[0] == 'Y')) {
+        if(promptYesOrNo()) {
             std::cerr << "[warning] Breakpoint at return address of main has been removed!\n";
             retAddrFromMain_ = nullptr;
         }

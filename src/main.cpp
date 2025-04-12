@@ -8,9 +8,9 @@
 #include <sys/personality.h>
 
 #include "../include/debugger.h"
-#include "../include/constants.h"
+// #include "../include/state.h"
 
-using constants::STOPWAIT_SIGNAL;
+// using state::STOPWAIT_SIGNAL;
 
 //cmake --build build to compile if changed this file
 // cmake -B build . along with command above if made changes to CMAKE settings

@@ -1,6 +1,7 @@
 #include "../include/debugger.h"
 #include "../include/memorymap.h"
 #include "../include/util.h"
+#include "../include/state.h"
 #include "../include/register.h"
 #include "../include/breakpoint.h"
 
@@ -21,41 +22,23 @@
 //using namespaces util and reg
 using namespace util;
 using namespace reg;
+using namespace state;
 
 //Debugger function: run()
 void Debugger::run() {
-    //std::cerr << "DEBUG: Calling waitForSignal() in run() \n";
-
-    waitForSignal();                       //debugger has control after ptrace TRACE_ME
-    //std::cerr << "DEBUG: Calling initialize() in run() \n";
-
+    //debugger has control after ptrace TRACE_ME
+    waitForSignal();                
     initialize();
 
     char* line;
     std::string prevArgs = "";
-    while(state_ == Child::running && (line = linenoise("[__p|d__] ")) != nullptr) {
+    while(isExecuting(state_) && (line = linenoise("[__p|d__] ")) != nullptr) {
         if(handleCommand(line, prevArgs)) {std::cout << std::endl;} //bool return for spacing/flushing
         linenoiseHistoryAdd(line);  //may need to initialize history
         linenoiseFree(line);
     }
 
-    bool killProcess = false;
-    if(state_ == Child::detached) {
-        std::cout << "End child process? [y/n] ";
-        std::string response = "";
-        std::getline(std::cin, response);
-        if(killProcess = (response.length() > 0 && (response[0] == 'y' || response[0] == 'Y'))) {
-            std::cerr << "[debug] Ending child process. Thank you for using Peek!\n";
-        }
-    }
-
-    if(state_ != Child::detached || killProcess) {
-        kill(pid_, SIGTRAP);
-        return;
-    }
-    cleanup();
-    std::cerr << "[debug] Cleanup complete! continuing...\n";
-    continueExecution();
+    handleChildState();
 }
 
 
@@ -215,10 +198,11 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
 
                 if(retAddrFromMain_ && retAddrFromMain_ == &(it->second) && retAddrFromMain_->isEnabled()) {
                     std::cerr << "[warning] Attemping to disable breakpoint at the return address of main. "
-                        "Confirm with [y/n]: ";
-                    std::string input = "";
-                    std::getline(std::cin, input);
-                    if(input.length() > 0 && (input[0] == 'y' || input[0] == 'Y')) {
+                        "Continue? ";
+                    // std::string input = "";
+                    // std::getline(std::cin, input);
+                    // if(input.length() > 0 && (input[0] == 'y' || input[0] == 'Y')) {
+                    if(promptYesOrNo()) {
                         std::cerr << "[warning] Breakpoint at return address of main has been disable!\n";
                     }
                     else {
@@ -251,24 +235,83 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
         dumpBreakpoints();
     }
     else if(argv[0] == "single_step" || argv[0] == "ss") {
+        if(state_ == Child::faulting && !(argv.size() > 1 && argv[1].length() > 0 && isPrefix(argv[1], "force"))) {
+            std::cerr << "[error] Must resolve fault before stepping. Use \"force\" to bypass";
+            return true;
+        }
         singleStepBreakpointCheck();
         printSourceAtPC();
         printMemoryLocationAtPC();
     }
     else if(isPrefix(argv[0], "step_in") || argv[0] == "si") {
+        if(state_ == Child::faulting) {
+            std::cerr << "[error] Must resolve fault before stepping in.";
+            return true;
+        }
         stepIn();
         printSourceAtPC();
         printMemoryLocationAtPC();        
     }
     else if(isPrefix(argv[0], "finish")) {
+        if(state_ == Child::faulting && !(argv.size() > 1 && argv[1].length() > 0 && isPrefix(argv[1], "force"))) {
+            std::cerr << "[error] Must resolve fault before stepping. Use \"force\" to bypass";
+            return true;
+        }
         stepOut();
         printSourceAtPC();
         printMemoryLocationAtPC();        
     }
     else if(isPrefix(argv[0], "next")) {
+        if(state_ == Child::faulting && !(argv.size() > 1 && argv[1].length() > 0 && isPrefix(argv[1], "force"))) {
+            std::cerr << "[error] Must resolve fault before stepping. Use \"force\" to bypass";
+            return true;
+        }
         stepOver();
         printSourceAtPC();
         printMemoryLocationAtPC();        
+    }
+    else if(argv[0] == "skip") {
+        std::cout << "[warning] Manually adjusting rip can misalign instructions. Continue? ";
+        if(!promptYesOrNo()) {
+            std::cout << "Aborting...";
+            return true;
+        }
+        else if(argv.size() == 1 || argv[1].length() < 1) {
+            skipUnsafeInstruction();
+            return true;
+        }
+        uint64_t skip;
+        if(!validDecStol(skip, argv[1])) {
+            std::cerr << "[error] Specify a valid number of bytes in decimal.";
+            return true;
+        }
+
+        skipUnsafeInstruction(std::bit_cast<size_t>(skip));
+    }
+    else if(argv[0] == "jump") {
+        std::cout << "[warning] Manually changing rip can lead to undefined results. Continue? ";
+        if(!promptYesOrNo()) {
+            std::cout << "Aborting...";
+            return true;
+        }
+        else if(argv.size() == 1 || argv[1].length() < 1) {
+            std::cerr << "[error] Specify an instruction.";
+            return true;
+        }
+
+        bool relativeAddr = (argv[1][0] == '*');
+        auto addr = stripAddrPrefix(argv[1]);
+        uint64_t instruction;
+
+        if(!validHexStol(instruction, addr)) {
+            std::cerr << "[error] Specify a valid instruction in hex.";
+            return true;
+        }
+        else if(relativeAddr) {
+            instruction = addLoadAddress(instruction);
+        }
+
+        jumpToInstruction(instruction);
     }
     else if(isPrefix(argv[0], "pid")) {
         //std::cout << "[debug] Retrieving child process ID...\n";
@@ -460,7 +503,8 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
     }
     else if(argv[0] == "q" || argv[0] == "e" || argv[0] == "exit" || argv[0] ==  "quit") {
         std::cout << "[debug] Exiting....";
-        state_ = Child::detached;
+        if(argv[1].length() > 0 && isPrefix(argv[1], "force")) state_ = Child::force_detach;
+        else state_ = Child::detach;
     }
     else {
         std::cout << "[error] Invalid Command!";
