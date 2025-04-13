@@ -177,32 +177,30 @@ std::pair<std::unordered_map<intptr_t, Breakpoint>::iterator, bool>
     return {addrToBp_.end(), false};
 }
 
-std::optional<intptr_t>Debugger::handleDuplicateFilenames( const std::string_view filepath,
-    const std::vector<std::pair<std::string, intptr_t>>& fpAndAddr)  {
-   if(fpAndAddr.empty()) return std::nullopt;
-   else if(fpAndAddr.size() == 1) {     //comment this else-if block out when testing
-       auto addr = fpAndAddr[0].second;
-       return std::bit_cast<intptr_t>(addLoadAddress(addr));
-   }
-
-   std::cout << "\n[info] Multiple matches found for '" << filepath << "':\n";
-   int count = 0;
-   for(const auto&[fp, addr] : fpAndAddr) {
-       std::cout << std::dec << "\t[" << count++ << "] " << fp
-           << " at 0x" << std::hex << std::uppercase << addr 
-           << " (0x" << addLoadAddress(addr) << ")\n";
-   }
-
-   std::cout << "\n[info] Select one to set a breakpoint (or abort): ";
-   std::string selection;
-   std::cin >> selection;
-   count = 0;
-   uint64_t index;
-   if(validDecStol(index, selection) && index < fpAndAddr.size()) {
-       auto addr = std::bit_cast<uint64_t>(fpAndAddr[index].second);
-       return std::bit_cast<intptr_t>(addLoadAddress(addr));
-   }
-   return std::nullopt;
+std::optional<intptr_t>Debugger::handleDuplicateFilenames( const std::string_view filepath, const std::vector<std::pair<std::string, intptr_t>>& fpAndAddr)  {
+    if(fpAndAddr.empty()) return std::nullopt;
+    else if(fpAndAddr.size() == 1) {     //comment this else-if block out when testing
+        auto addr = fpAndAddr[0].second;
+        return std::bit_cast<intptr_t>(addLoadAddress(addr));
+    }
+    std::cout << "\n[info] Multiple matches found for '" << filepath << "':\n";
+    int count = 0;
+    for(const auto&[fp, addr] : fpAndAddr) {
+        std::cout << std::dec << "\t[" << count++ << "] " << fp
+            << " at 0x" << std::hex << std::uppercase << addr 
+            << " (0x" << addLoadAddress(addr) << ")\n";
+    }
+ 
+    std::cout << "\n[info] Select one to set a breakpoint (or abort): ";
+    std::string selection;
+    std::cin >> selection;
+    count = 0;
+    uint64_t index;
+    if(validDecStol(index, selection) && index < fpAndAddr.size()) {
+        auto addr = std::bit_cast<uint64_t>(fpAndAddr[index].second);
+        return std::bit_cast<intptr_t>(addLoadAddress(addr));
+    }
+    return std::nullopt;
 }
 
 

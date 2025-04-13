@@ -448,6 +448,18 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
         else
             std::cout << "[error] Please specify address!";
     }
+    else if(isPrefix(argv[0], "symbol_lookup") || argv[0] == "sl") {
+        if(argv.size() > 1 && argv[1].length() > 0 && !hasWhiteSpace(argv[1])) {
+            bool strict = argv.size() > 2 && argv[2] == "strict";
+            auto list = symMap_.getSymbolListFromName(argv[1], strict);
+
+            std::cout << "\n[debug] Symbols with name '" << argv[1] 
+                << "':\n--------------------------------------------------------\n";
+            SymbolMap::dumpSymbolList(list, argv[1], strict);
+            std::cout << "--------------------------------------------------------"; 
+        }
+        else std::cout << "[error] Symbol name is invalid!";
+    }
     else if(argv[0] == "set_context" || argv[0] == "sc") {
         if(argv.size() > 1 && !argv[1].empty()) {
             uint64_t newContext;

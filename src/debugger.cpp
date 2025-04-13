@@ -116,7 +116,7 @@ void Debugger::handleChildState() {
         switch(state_) {
             case Child::running:
             case Child::faulting:
-                std::cout << "[critical] Debugger has terminated in an inconsistant state\n";
+                std::cout << "[critical] Debugger has terminated in an inconsistent state\n";
                 state_ = Child::force_detach;
                 continue;
             case Child::force_detach:
@@ -125,7 +125,7 @@ void Debugger::handleChildState() {
                 //std::getline(std::cin, response);
                 // if(response.length() > 0 && (response[0] == 'y' || response[0] == 'Y')) {
                 if(promptYesOrNo()) {
-                    std::cerr << "[debug] Ending child process. Thank you for using Peek!\n";
+                    std::cerr << "[info] Ending child process. Thank you for using Peek!\n";
                     state_ = Child::kill;
                     continue;
                 }
@@ -364,7 +364,7 @@ void Debugger::waitForSignal() {
 
     if(memMap_.initialized() && isExecuting(state_)) memMap_.reload();
     auto signal = getSignalInfo();
-    if(signal.si_signo != SIGSEGV) state_ = Child::running;
+    // if(signal.si_signo != SIGSEGV && state_ == Child::faulting) state_ = Child::running;
     
     switch(signal.si_signo) {
         case SIGTRAP:
@@ -375,8 +375,11 @@ void Debugger::waitForSignal() {
                     getPC() == std::bit_cast<uint64_t>(retAddrFromMain_->getAddr())) {
                 std::cout << "[debug] In Debugger::waitForSignal() - Main return Breakpoint hit!\n";
                     //"[debug] Preparing to cleanup and exit...\n";
-                state_ = Child::finish;
+                if(state_ == Child::running) state_ = Child::finish;
+                else if(state_ == Child::faulting) state_ = Child::force_detach;
             }
+
+            if(state_ == Child::faulting) state_ = Child::running;
             return;
         case SIGSEGV:
            // std::cerr << "DEBUG : Handling SIGSEGV\n";

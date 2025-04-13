@@ -76,7 +76,7 @@ std::vector<SymbolMap::Symbol> SymbolMap::getSymbolListFromName(const std::strin
         auto type = section.get_hdr().type;
         if(type != elf::sht::symtab && type != elf::sht::dynsym) continue;
 
-        std::cout << "\n------------------------TEST-BEGIN--------------------------\n";
+        // std::cout << "\n------------------------TEST-BEGIN--------------------------\n";
         for(auto symbol : section.as_symtab()) {
             auto symName = symbol.get_name();
             if(symName.empty()) continue;

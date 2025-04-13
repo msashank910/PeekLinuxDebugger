@@ -40,9 +40,8 @@ void Debugger::singleStepBreakpointCheck() {
     if(retAddrFromMain_ && it != addrToBp_.end() && retAddrFromMain_ == &(it->second)) {    //time to exit! 
         std::cout << "[debug] In Debugger::singleStepBreakpointCheck() - Main return Breakpoint hit!\n";
             //"[debug] Preparing to cleanup and exit...\n";
-        // cleanup();
-        // continueExecution();
-        state_ = Child::finish;
+        if(state_ == Child::running) state_ = Child::finish;
+        else if(state_ == Child::faulting) state_ = Child::force_detach;
         return;
     }
     else if(it == addrToBp_.end()) {
