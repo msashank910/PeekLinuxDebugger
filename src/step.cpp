@@ -85,7 +85,7 @@ bool Debugger::validMemoryRegionShouldStep(std::optional<dwarf::line_table::iter
     else if(!chunk) {
         std::cerr << "[info] PC at 0x" << std::hex << std::uppercase << getPC() 
             << " is not in any mapped memory region. Terminating debugger session - "
-            << "Thank you for using Peek\n";
+            "Thank you for using Peek\n";
         state_ = Child::kill;
         return false; 
     }
@@ -391,7 +391,7 @@ void Debugger::skipUnsafeInstruction(const size_t bytes) {
     std::cout << "[debug] Rip has been set 0x" << std::hex << std::uppercase << rip
         << " (0x" << offsetLoadAddress(rip) << ") --> 0x" << (newRip) 
         << " (0x" << offsetLoadAddress(newRip) << ")\n"
-        << "[debug] " << ripChunkMem << " --> " << newRipChunkMem << "\n";
+        "[debug] " << ripChunkMem << " --> " << newRipChunkMem << "\n";
 }
 
 
@@ -426,5 +426,5 @@ void Debugger::jumpToInstruction(const uint64_t newRip) {
     std::cout << "[debug] Rip has been set 0x" << std::hex << std::uppercase << rip
         << " (0x" << offsetLoadAddress(rip) << ") --> 0x" << (newRip) 
         << " (0x" << offsetLoadAddress(newRip) << ")\n"
-        << "[debug] " << ripChunkMem << " --> " << newRipChunkMem << "\n";
+        "[debug] " << ripChunkMem << " --> " << newRipChunkMem << "\n";
 }

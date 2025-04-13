@@ -41,8 +41,8 @@ MemoryMap::MemoryMap(pid_t pid, const std::string& pathToExectuable) : pid_ (pid
     std::ifstream file;
     file.open("/proc/" + std::to_string(pid) + "/maps");
     if(!file.is_open()) {
-        throw std::runtime_error(std::string("[fatal] In MemoryMap::MemoryMap() - ")
-            + "/proc/pid/maps could not be opened! Check permisions.\n");
+        throw std::runtime_error("[fatal] In MemoryMap::MemoryMap() - "
+            "/proc/pid/maps could not be opened! Check permisions.\n");
     }
     std::string line = "";
     
@@ -60,8 +60,8 @@ MemoryMap::MemoryMap(pid_t pid, const std::string& pathToExectuable) : pid_ (pid
         auto addrHigh = view.substr(dashPos + 1, spacePos - (dashPos + 1));
         if(!validHexStol(low, addrLow) || !validHexStol(high, addrHigh)) {
             file.close();
-            throw std::runtime_error(std::string("[fatal] In MemoryMap::MemoryMap() - ")
-                 + "Address space not resolved correctly\n");
+            throw std::runtime_error("[fatal] In MemoryMap::MemoryMap() - "
+                "Address space not resolved correctly\n");
         }
 
         view = view.substr(spacePos + 1);
@@ -170,18 +170,18 @@ void MemoryMap::printChunk(uint64_t pc) const {
 
         const auto& perms = c.perms;
         std::cout << "--------------------------------------------------------\n"
-            << "Current Chunk --> " << c.pathname << "\n" 
-            << "Path Type: " << getNameFromPath(c.path) << "\n"
-            << "Permissions (read-write-execute-shared): " 
+            "Current Chunk --> " << c.pathname << "\n" 
+            "Path Type: " << getNameFromPath(c.path) << "\n"
+            "Permissions (read-write-execute-shared): " 
                 << (perms.read ? "r" : "-")
                 << (perms.write ? "w" : "-")
                 << (perms.execute ? "x" : "-")
                 << (perms.shared ? "s" : "p")
                 << "\n"
-            << "Lowest Address: " << std::hex << std::uppercase << c.addrLow << "\n"
-            << "Highest Address: " << c.addrHigh << "\n"
-            << "(" << c.addrLow << "-" << c.addrHigh << ")\n"
-            << "--------------------------------------------------------\n";
+            "Lowest Address: " << std::hex << std::uppercase << c.addrLow << "\n"
+            "Highest Address: " << c.addrHigh << "\n"
+            "(" << c.addrLow << "-" << c.addrHigh << ")\n"
+            "--------------------------------------------------------\n";
         return;
     }
     std::cout << "[warning] Address is not in mapped memory\n";
@@ -198,17 +198,17 @@ void MemoryMap::dumpChunks() const {
     for(const auto& c : chunks_) {
         const auto& perms = c.perms;
         std::cout << std::dec << i << ") " << c.pathname << "\n" 
-            << "Path Type: " << getNameFromPath(c.path) << "\n"
-            << "Permissions (read-write-execute-shared): " 
+            "Path Type: " << getNameFromPath(c.path) << "\n"
+            "Permissions (read-write-execute-shared): " 
                 << (perms.read ? "r" : "-")
                 << (perms.write ? "w" : "-")
                 << (perms.execute ? "x" : "-")
                 << (perms.shared ? "s" : "p")
                 << "\n"
-            << "Lowest Address: " << std::hex << std::uppercase << c.addrLow << "\n"
-            << "Highest Address: " << c.addrHigh << "\n"
-            << "(" << c.addrLow << "-" << c.addrHigh << ")\n"
-            << "--------------------------------------------------------\n";
+            "Lowest Address: " << std::hex << std::uppercase << c.addrLow << "\n"
+            "Highest Address: " << c.addrHigh << "\n"
+            "(" << c.addrLow << "-" << c.addrHigh << ")\n"
+            "--------------------------------------------------------\n";
         ++i;
     }
 }

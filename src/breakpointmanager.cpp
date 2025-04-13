@@ -276,7 +276,7 @@ void Debugger::dumpBreakpoints() const {
 
         std::cout << "\n" << std::dec << count << ") 0x" << std::hex << std::uppercase << addr 
             << " (0x" << offsetLoadAddress(addr) << ")"
-            << " [" << ((it.second.isEnabled()) ? "enabled" : "disabled") << "]";
+            " [" << ((it.second.isEnabled()) ? "enabled" : "disabled") << "]";
         ++count;
     }
     std::cout << std::endl;

@@ -132,7 +132,7 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
             }
             else
                 std::cout << "[error] Invalid address!\n[info] Pass a valid relative address (*0x1234) "
-                    << "or a valid absolute address (0xFFFFFFFF).";
+                    "or a valid absolute address (0xFFFFFFFF).";
         }
         else {
             std::string_view func = argv[1];
@@ -178,7 +178,7 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
             }
             else
                 std::cout << "[error] Invalid address!\n[info] Pass a valid relative address (*0x1234) "
-                    << "or a valid absolute address (0xFFFFFFFF).";
+                    "or a valid absolute address (0xFFFFFFFF).";
         }
         else
             std::cout << "[error] Please specify address!";
@@ -224,7 +224,7 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
             }
             else
                 std::cout << "[error] Invalid address!\n[info] Pass a valid relative address (*0x1234) "
-                    << "or a valid absolute address (0xFFFFFFFF).";
+                    "or a valid absolute address (0xFFFFFFFF).";
         }
         else
             std::cout << "[error] Please specify address!";

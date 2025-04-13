@@ -62,7 +62,7 @@ void Debugger::initialize() {
     auto [mainBp, success] = setBreakpointAtFunctionName("main");
     if(!success) {
         std::cerr << "\n[critical] Could not set a breakpoint on first valid line in main().\n"
-        "[critical] Could not set a breakpoint on the return address of main().\n";
+            "[critical] Could not set a breakpoint on the return address of main().\n";
         return;
     }        
     continueExecution();    
@@ -85,8 +85,8 @@ void Debugger::initializeMapsAndLoadAddress() {
     if(elf_.get_hdr().type == elf::et::dyn) {
         std::unique_ptr<char, decltype(&free)> ptr(realpath(progName_.c_str(), nullptr), free);
         if(!ptr) {
-            throw std::logic_error(std::string("\n[fatal] In Debugger::initializeMemoryMapAndLoadAddress() - ") 
-                + " Invalid or nonexistant program name, realpath() failed!\n");
+            throw std::logic_error("\n[fatal] In Debugger::initializeMemoryMapAndLoadAddress() - "
+                " Invalid or nonexistant program name, realpath() failed!\n");
         }
 
         std::string absFilePath = ptr.get();
@@ -213,8 +213,8 @@ void Debugger::initializeFunctionDies() {
         if(!offset.empty()) functionDies_[&cu] = std::move(offset);
     }
     if(functionDies_.empty())
-        throw std::out_of_range(std::string("\n[fatal] In Debugger::initializeFunctionDies() - ") 
-            + "No functions found. Something is definitely wrong!\n");
+        throw std::out_of_range("\n[fatal] In Debugger::initializeFunctionDies() - " 
+            "No functions found. Something is definitely wrong!\n");
 }
 
 
@@ -241,7 +241,7 @@ void Debugger::dumpFunctionDies() {
         }
     }
     std::cout << "--------------------------------------------------------\n"
-         << "[debug] Total functions: " << totalFunctionCount << "\n";
+         "[debug] Total functions: " << totalFunctionCount << "\n";
 }
 
 
@@ -285,8 +285,8 @@ void Debugger::printSource(const std::string fileName, unsigned line, uint8_t nu
     file.open(fileName, std::ios::in);
 
     if(!file.is_open()) {
-        throw std::runtime_error(std::string("\n[fatal] In Debugger::printSource() - ")
-            + "File could not be opened! Check permisions.\n");
+        throw std::runtime_error("\n[fatal] In Debugger::printSource() - "
+            "File could not be opened! Check permisions.\n");
     }
     
     //calculate uniform spacing based on digits floor(log10(n)) + 1 --> number of digits in n
@@ -346,8 +346,8 @@ void Debugger::waitForSignal() {
     errno = 0;
 
     if(waitpid(pid_, &wait_status, options) == -1) {
-        throw std::runtime_error(std::string("[fatal] In Debugger::waitForSignal() - ")
-            + "ptrace error: " + std::string(strerror(errno)) + ".\n Waitpid failed!\n");
+        throw std::runtime_error("[fatal] In Debugger::waitForSignal() - "
+            "ptrace error: " + std::string(strerror(errno)) + ".\n Waitpid failed!\n");
     }
 
     if(WIFEXITED(wait_status)) {

@@ -116,7 +116,7 @@ void SymbolMap::dumpSymbolList(const std::vector<Symbol>& symbolList, const std:
         if(strict && symName != name) continue;
         std::cout << "\t" << std::dec << symCount++ << ") " << symName
             << " (" << getNameFromSym(sym) << ")"
-            << " --> 0x" << std::hex << std::uppercase << addr << "\n";
+            " --> 0x" << std::hex << std::uppercase << addr << "\n";
     }
 }
 
@@ -140,8 +140,8 @@ void SymbolMap::dumpSymbolCache(const std::string& name, bool strict) const {
         std::cout << "[error] No symbol cache for '" << name << "'!";
         return;
     }
-    std::cout << "\n--------------------------------------------------------\n";
-    std::cout << "[debug] Dumping symbols with name '" << name << "':\n";
+    std::cout << "\n--------------------------------------------------------\n"
+        "[debug] Dumping symbols with name '" << name << "':\n";
     dumpSymbolList(it->second, name, strict);
     std::cout << "--------------------------------------------------------\n";
 }
