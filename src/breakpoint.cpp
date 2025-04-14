@@ -9,15 +9,15 @@
 
 
 //Breakpoint Methods
-Breakpoint::Breakpoint() = default;
+// Breakpoint::Breakpoint() = default;
 Breakpoint::Breakpoint(pid_t pid, std::intptr_t addr) : pid_(pid), addr_(addr), enabled_(false), data_(0) {}
 
-Breakpoint::Breakpoint(Breakpoint&&) = default;
-Breakpoint& Breakpoint::operator=(Breakpoint&&) = default;
-Breakpoint::~Breakpoint() = default;
+// Breakpoint::Breakpoint(Breakpoint&&) = default;
+// Breakpoint& Breakpoint::operator=(Breakpoint&&) = default;
+// Breakpoint::~Breakpoint() = default;
 
-Breakpoint::Breakpoint(const Breakpoint&) = delete;
-Breakpoint& Breakpoint::operator=(const Breakpoint&) = delete;
+// Breakpoint::Breakpoint(const Breakpoint&) = delete;
+// Breakpoint& Breakpoint::operator=(const Breakpoint&) = delete;
 
 bool Breakpoint::isEnabled() const {return enabled_;}     
 std::uint8_t Breakpoint::getData() const {return data_;} 

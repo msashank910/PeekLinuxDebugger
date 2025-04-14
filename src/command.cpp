@@ -59,17 +59,35 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
         printMemoryLocationAtPC();
         //return false;
     }
-    else if(argv[0] == "debug") {   //debug command args currently - "debug" <name> ["strict"]
-        if(argv.size() > 1 && argv[1].length() > 0 && !hasWhiteSpace(argv[1])) {
-            bool strict = argv.size() > 2 && argv[2] == "strict";
-            auto list = symMap_.getSymbolListFromName(argv[1], strict);
-
-            std::cout << "[debug] Symbols with name '" << argv[1] 
-                << "':\n--------------------------------------------------------\n";
-            SymbolMap::dumpSymbolList(list, argv[1], strict);
-            std::cout << "--------------------------------------------------------"; 
+    else if(argv[0] == "debug") {   //Change size of symbolCache
+        uint64_t num;
+        if(argv.size() > 1 && argv[1].length() > 0 && validDecStol(num, argv[1])) {
+            std::cout << "prev cache size: " << std::dec << symMap_.getMaxSymbolCacheSize() << "\n";
+            std::string random;
+            handleCommand("ds", random);
+            symMap_.setMaxSymbolCacheSize(static_cast<size_t>(num));
+            std::cout << "curr cache size: " << std::dec << symMap_.getMaxSymbolCacheSize() << "\n";
+            handleCommand("ds", random);
         }
-        else std::cout << "[error] Symbol name is invalid!";
+        else std::cout << "[error] Cache size is invalid!";
+    }
+    else if(argv[0] == "debug2") {   //debug command args currently - "debug" <name> ["strict"]
+        uint64_t num;
+        if(argv.size() > 1 && argv[1].length() > 0 && validDecStol(num, argv[1])) {
+            if(num > UINT8_MAX) {
+                std::cerr << "[error] Invalid minimum key length in cache\n[info] Must be from 0-255 inclusive!";
+                return true;
+            }
+            std::cout << "prev str length: " << std::dec 
+                << static_cast<size_t>(symMap_.getMinCachedStringLength()) << "\n";
+            std::string random;
+            handleCommand("ds", random);
+            symMap_.setMinCachedStringLength(static_cast<uint8_t>(num));
+            std::cout << "curr str length: " << std::dec 
+                << static_cast<size_t>(symMap_.getMinCachedStringLength()) << "\n";
+            handleCommand("ds", random);
+        }
+        else std::cout << "[error] Key length is invalid!";
     }
     else if(isPrefix(argv[0], "breakpoint")) {
         //std::cout << "Placing breakpoint\n";
@@ -475,6 +493,36 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
             std::cout << "[debug] Number of context lines is currently: " 
                 << std::dec << static_cast<int>(getContext());
         }
+    }
+    else if(argv[0] == "set_cache_max" || argv[0] == "scm") {   //Change size of symbolCache
+        uint64_t num;
+        if(argv.size() > 1 && argv[1].length() > 0 && validDecStol(num, argv[1])) {
+            std::cout << "prev cache size: " << std::dec << symMap_.getMaxSymbolCacheSize() << "\n";
+            std::string random;
+            handleCommand("ds", random);
+            symMap_.setMaxSymbolCacheSize(static_cast<size_t>(num));
+            std::cout << "curr cache size: " << std::dec << symMap_.getMaxSymbolCacheSize() << "\n";
+            handleCommand("ds", random);
+        }
+        else std::cout << "[error] Cache size is invalid!";
+    }
+    else if(argv[0] == "set_symbol_min" || argv[0] == "ssm") {   //debug command args currently - "debug" <name> ["strict"]
+        uint64_t num;
+        if(argv.size() > 1 && argv[1].length() > 0 && validDecStol(num, argv[1])) {
+            if(num > UINT8_MAX) {
+                std::cerr << "[error] Invalid minimum key length in cache\n[info] Must be from 0-255 inclusive!";
+                return true;
+            }
+            std::cout << "prev str length: " << std::dec 
+                << static_cast<size_t>(symMap_.getMinCachedStringLength()) << "\n";
+            std::string random;
+            handleCommand("ds", random);
+            symMap_.setMinCachedStringLength(static_cast<uint8_t>(num));
+            std::cout << "curr str length: " << std::dec 
+                << static_cast<size_t>(symMap_.getMinCachedStringLength()) << "\n";
+            handleCommand("ds", random);
+        }
+        else std::cout << "[error] Key length is invalid!";
     }
     else if(argv[0] == "program_counter" || argv[0] == "pc") {
         printSourceAtPC();
