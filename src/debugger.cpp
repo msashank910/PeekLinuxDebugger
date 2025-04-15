@@ -122,9 +122,9 @@ void Debugger::handleChildState() {
                 continue;
             case Child::force_detach:
             case Child::detach:
-                std::cout << "[debug] End child process? "; // [y/n] ";
-                //std::getline(std::cin, response);
-                // if(response.length() > 0 && (response[0] == 'y' || response[0] == 'Y')) {
+                std::cout << "[debug] End child process? "; 
+
+                //Let user decide if child process should be killed
                 if(promptYesOrNo()) {
                     std::cerr << "[info] Ending child process. Thank you for using Peek!\n";
                     state_ = Child::kill;
@@ -148,7 +148,7 @@ void Debugger::handleChildState() {
         ptrace(PTRACE_DETACH, pid_, nullptr, SIGCONT);
         return;
     }
-    std::cerr << "[debug] Cleanup complete! continuing...\n\n";
+    //std::cerr << "[debug] Cleanup complete! continuing...\n";
     continueExecution();
 }
 
@@ -171,7 +171,6 @@ void Debugger::cleanup() {
     std::getline(std::cin, debugString);
     //detach from process
    // ptrace(PTRACE_TRACEME, 0, nullptr, nullptr);
-
 }
 
 void Debugger::continueExecution() {
@@ -369,13 +368,12 @@ void Debugger::waitForSignal() {
     
     switch(signal.si_signo) {
         case SIGTRAP:
-        //std::cerr << "DEBUG : Handling SIGTRAP\n";
             handleSIGTRAP(signal);
 
             if(retAddrFromMain_ && isExecuting(state_) && 
                     getPC() == std::bit_cast<uint64_t>(retAddrFromMain_->getAddr())) {
                 std::cout << "[debug] In Debugger::waitForSignal() - Main return Breakpoint hit!\n";
-                    //"[debug] Preparing to cleanup and exit...\n";
+
                 if(state_ == Child::running) state_ = Child::finish;
                 else if(state_ == Child::faulting) state_ = Child::force_detach;
             }

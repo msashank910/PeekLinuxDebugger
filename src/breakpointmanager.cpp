@@ -211,10 +211,8 @@ void Debugger::removeBreakpoint(intptr_t address) {
     if(retAddrFromMain_ && retAddrFromMain_->getAddr() == address && retAddrFromMain_->isEnabled()) {
         std::cerr << "[warning] Attemping to remove breakpoint at the return address of main. "
             "Continue? ";
-        //    "Confirm with [y/n]: ";
-        // std::string input = "";
-        // std::getline(std::cin, input);
-        // if(input.length() > 0 && (input[0] == 'y' || input[0] == 'Y')) {
+        
+        //Let user decide if breakpoint should be removed
         if(promptYesOrNo()) {
             std::cerr << "[warning] Breakpoint at return address of main has been removed!\n";
             retAddrFromMain_ = nullptr;
@@ -232,18 +230,14 @@ void Debugger::removeBreakpoint(intptr_t address) {
         }
         addrToBp_.erase(address);
     }
-    //std::cerr << "DEBUG: bp removed!\n";
-
 }
 
 void Debugger::removeBreakpoint(std::unordered_map<intptr_t, Breakpoint>::iterator it) {
     if(retAddrFromMain_ && retAddrFromMain_ == &(it->second) && retAddrFromMain_->isEnabled()) {
         std::cerr << "[warning] Attemping to remove breakpoint at the return address of main. "
             "Continue? ";
-            //"Confirm with [y/n]: ";
-        // std::string input = "";
-        // std::getline(std::cin, input);
-        //if(input.length() > 0 && (input[0] == 'y' || input[0] == 'Y')) {
+
+        //Let user decide if breakpoint should be removed
         if(promptYesOrNo()) {
             std::cerr << "[warning] Breakpoint at return address of main has been removed!\n";
             retAddrFromMain_ = nullptr;

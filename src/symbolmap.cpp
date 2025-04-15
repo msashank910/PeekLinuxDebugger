@@ -89,14 +89,21 @@ SymbolMap::Sym SymbolMap::getSymFromElf(elf::stt s) const {
 
 std::vector<SymbolMap::Symbol> SymbolMap::getSymbolListFromName(const std::string& name, bool strict) {
     auto it = nonStrictSymbolCache_.find(name);
-    if(it != nonStrictSymbolCache_.end() && !strict) return it->second;
-
     std::vector<Symbol> strictMatches;
+
     if(it != nonStrictSymbolCache_.end()) {
-        for(auto& symbol : it->second) {
-            if(name == symbol.name) strictMatches.push_back(symbol);
+        auto erase = config_->touchKey(name);
+        if(erase != "") {
+            std::cerr << "[warning] Cache is out of sync with LRU config. Clear cache to reset.";
         }
-        return strictMatches;
+
+        if(!strict) return it->second;
+        else {
+            for(auto& symbol : it->second) {
+                if(name == symbol.name) strictMatches.push_back(symbol);
+            }
+            return strictMatches;
+        }
     }
 
     std::vector<Symbol> nonStrictMatches;
@@ -149,6 +156,7 @@ std::vector<SymbolMap::Symbol> SymbolMap::getSymbolListFromName(const std::strin
 
 void SymbolMap::dumpSymbolList(const std::vector<Symbol>& symbolList, const std::string& name, bool strict) {
     if(symbolList.empty()) {
+        //Could be formatted better
         std::cout << "[error] Symbol list for '" << name << "' is empty!\n";
         return;
     }
@@ -187,5 +195,10 @@ void SymbolMap::dumpSymbolCache(const std::string& name, bool strict) const {
     std::cout << "--------------------------------------------------------\n";
 }
 
+
+void SymbolMap::clearCache() {
+    config_->clearCache();
+    nonStrictSymbolCache_.clear();
+}
 
 

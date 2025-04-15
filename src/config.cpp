@@ -73,3 +73,7 @@ std::vector<std::string> Config::SymbolConfig::configureCache() {
     return deletion;
 }
 
+void Config::SymbolConfig::clearCache() {
+    lruList_.clear();
+    lruMap_.clear();
+}

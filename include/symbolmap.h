@@ -29,6 +29,7 @@ public:
     void setMinCachedStringLength(uint8_t length);
     size_t getMaxSymbolCacheSize();
     void setMaxSymbolCacheSize(size_t size);
+    void clearCache();
 
 
 
@@ -52,7 +53,7 @@ public:
 
     std::vector<Symbol> getSymbolListFromName(const std::string& name, bool strict = true);
     static void dumpSymbolList(const std::vector<Symbol>& symbolList, const std::string& name, 
-        bool strict = true);
+        bool strict = false);
     void dumpSymbolCache(bool strict = false) const;
     void dumpSymbolCache(const std::string& name, bool strict = false) const;
     

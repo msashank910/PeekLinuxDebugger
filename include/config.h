@@ -38,12 +38,13 @@ public:
     */
     struct SymbolConfig {
     // size_t symbolListSize_;
-        size_t symbolCacheSize_ = 100;
+        size_t symbolCacheSize_ = 7;
         // bool strictSymbolMatch_ = false;
         uint8_t minCachedStringLength_ = 3; 
         SymbolConfig();
         std::string touchKey(const std::string&);
         std::vector<std::string> configureCache();
+        void clearCache();
     
     private:
         std::list<std::string> lruList_;

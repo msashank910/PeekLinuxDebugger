@@ -53,7 +53,7 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
     prevArgs = input;
 
     if(isPrefix(argv[0], "continue_execution")) {
-        std::cout << "[debug] Continue Execution..." << std::endl;
+        std::cout << "[debug] Continue Execution...\n" << std::endl;
         continueExecution();
         printSourceAtPC();
         printMemoryLocationAtPC();
@@ -217,9 +217,8 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
                 if(retAddrFromMain_ && retAddrFromMain_ == &(it->second) && retAddrFromMain_->isEnabled()) {
                     std::cerr << "[warning] Attemping to disable breakpoint at the return address of main. "
                         "Continue? ";
-                    // std::string input = "";
-                    // std::getline(std::cin, input);
-                    // if(input.length() > 0 && (input[0] == 'y' || input[0] == 'Y')) {
+
+                    //Let user decide whether main bp should be disabled
                     if(promptYesOrNo()) {
                         std::cerr << "[warning] Breakpoint at return address of main has been disable!\n";
                     }
@@ -496,33 +495,45 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
     }
     else if(argv[0] == "set_cache_max" || argv[0] == "scm") {   //Change size of symbolCache
         uint64_t num;
-        if(argv.size() > 1 && argv[1].length() > 0 && validDecStol(num, argv[1])) {
-            std::cout << "prev cache size: " << std::dec << symMap_.getMaxSymbolCacheSize() << "\n";
-            std::string random;
-            handleCommand("ds", random);
+        if(argv.size() > 1 && argv[1].length() > 0 && validDecStol(num, argv[1]) && num != 0) {
+
+            auto prevSize = symMap_.getMaxSymbolCacheSize();
             symMap_.setMaxSymbolCacheSize(static_cast<size_t>(num));
-            std::cout << "curr cache size: " << std::dec << symMap_.getMaxSymbolCacheSize() << "\n";
-            handleCommand("ds", random);
+            auto currSize = symMap_.getMaxSymbolCacheSize();
+
+            std::cout << "[debug] Max cache size: " << std::dec 
+                << prevSize << " --> " << currSize;
+        }
+        else if(argv.size() == 1) {
+            std::cout << "[debug] Max cache size is currently: " 
+                << std::dec << symMap_.getMaxSymbolCacheSize();
         }
         else std::cout << "[error] Cache size is invalid!";
     }
     else if(argv[0] == "set_symbol_min" || argv[0] == "ssm") {   //debug command args currently - "debug" <name> ["strict"]
         uint64_t num;
-        if(argv.size() > 1 && argv[1].length() > 0 && validDecStol(num, argv[1])) {
+        if(argv.size() > 1 && argv[1].length() > 0 && validDecStol(num, argv[1]) && num != 0) {
             if(num > UINT8_MAX) {
-                std::cerr << "[error] Invalid minimum key length in cache\n[info] Must be from 0-255 inclusive!";
+                std::cerr << "[error] Invalid minimum key length in cache\n[info] Must be from 1-255 inclusive!";
                 return true;
             }
-            std::cout << "prev str length: " << std::dec 
-                << static_cast<size_t>(symMap_.getMinCachedStringLength()) << "\n";
-            std::string random;
-            handleCommand("ds", random);
+
+            auto prevLength = static_cast<size_t>(symMap_.getMinCachedStringLength());
             symMap_.setMinCachedStringLength(static_cast<uint8_t>(num));
-            std::cout << "curr str length: " << std::dec 
-                << static_cast<size_t>(symMap_.getMinCachedStringLength()) << "\n";
-            handleCommand("ds", random);
+            auto currLength = static_cast<size_t>(symMap_.getMinCachedStringLength());
+
+            std::cout << "[debug] Min symbol length: " << std::dec 
+                << prevLength << " --> " << currLength;
+        }
+        else if(argv.size() == 1) {
+            std::cout << "[debug] Min symbol length is currently: " 
+                << std::dec << static_cast<size_t>(symMap_.getMinCachedStringLength());
         }
         else std::cout << "[error] Key length is invalid!";
+    }
+    else if(argv[0] == "clear_symbol_cache" || argv[0] == "csc") {
+        std::cout << "[debug] Clearing symbol cache...";
+        symMap_.clearCache();
     }
     else if(argv[0] == "program_counter" || argv[0] == "pc") {
         printSourceAtPC();
@@ -547,6 +558,17 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
         }
         std::cout << "[debug] Dumping all symbol caches...";
         symMap_.dumpSymbolCache();
+
+    }
+    else if(argv[0] == "dump_symbols_strict" || argv[0] == "dss") {
+
+        if(argv.size() > 1 && argv[1].length() > 0 && !hasWhiteSpace(argv[1])) {
+            std::cout << "[debug] Dumping symbol cache for " << argv[1] << " ...";
+            symMap_.dumpSymbolCache(argv[1], true);
+            return true;
+        }
+        std::cout << "[debug] Dumping all symbol caches...";
+        symMap_.dumpSymbolCache(true);
 
     }
     else if(argv[0] == "dump_functions" || argv[0] == "df") {
