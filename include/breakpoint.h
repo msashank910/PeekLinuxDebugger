@@ -5,23 +5,23 @@
 
 
 class Breakpoint {
-    pid_t pid_;
-    std::intptr_t addr_;
-    bool enabled_;
-    std::uint8_t data_;
+    pid_t pid_ = 0;
+    std::intptr_t addr_ = 0;
+    bool enabled_ = 0;
+    std::uint8_t data_ = 0;
     
     static constexpr std::uint8_t mask_ = 0xFF;
 
 public:
-    Breakpoint();
+    Breakpoint() = default;
     Breakpoint(pid_t pid, std::intptr_t addr);
     
-    Breakpoint(Breakpoint&&);
-    Breakpoint& operator=(Breakpoint&&);
-    ~Breakpoint();
+    Breakpoint(Breakpoint&&) = default;
+    Breakpoint& operator=(Breakpoint&&) = default;
+    ~Breakpoint() = default;
     
-    Breakpoint(const Breakpoint&);
-    Breakpoint& operator=(const Breakpoint&);
+    Breakpoint(const Breakpoint&) = delete;
+    Breakpoint& operator=(const Breakpoint&) = delete;
 
     bool isEnabled() const;
     std::uint8_t getData() const;

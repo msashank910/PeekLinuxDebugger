@@ -12,15 +12,15 @@
 class MemoryMap {
 
 public: 
-    MemoryMap();    //default until actually constructed in initializeMemoryMapAndLoadAddress()
+    MemoryMap() = default;    //default until actually constructed in initializeMemoryMapAndLoadAddress()
     MemoryMap(pid_t pid_, const std::string& pathToExecutable);
 
-    MemoryMap(MemoryMap&&);
-    MemoryMap& operator=(MemoryMap&&);
-    ~MemoryMap();
+    MemoryMap(MemoryMap&&) = default;
+    MemoryMap& operator=(MemoryMap&&) = default;
+    ~MemoryMap() = default;
 
-    MemoryMap(const MemoryMap&);
-    MemoryMap& operator=(const MemoryMap&);
+    MemoryMap(const MemoryMap&) = delete;
+    MemoryMap& operator=(const MemoryMap&) = delete;
     
     void reload();
     //parseProcPidMaps()
@@ -90,7 +90,7 @@ public:
 
 private:
     //may need to incorporate mutex --> look into lock_guard for RAII
-    pid_t pid_;
+    pid_t pid_ = 0;
     std::string exec_;
     std::vector<Chunk> chunks_;
 

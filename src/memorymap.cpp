@@ -36,7 +36,7 @@ bool MemoryMap::Chunk::canRead() const { return perms.read; }
 bool MemoryMap::Chunk::canWrite() const { return perms.write; }
 bool MemoryMap::Chunk::canExecute() const { return perms.execute; }
 
-MemoryMap::MemoryMap() = default;
+// MemoryMap::MemoryMap() = default;
 MemoryMap::MemoryMap(pid_t pid, const std::string& pathToExectuable) : pid_ (pid), exec_(pathToExectuable) {
     std::ifstream file;
     file.open("/proc/" + std::to_string(pid) + "/maps");
@@ -84,12 +84,12 @@ MemoryMap::MemoryMap(pid_t pid, const std::string& pathToExectuable) : pid_ (pid
 }
 
 
-MemoryMap::MemoryMap(MemoryMap&&) = default;
-MemoryMap& MemoryMap::operator=(MemoryMap&&) = default;
-MemoryMap::~MemoryMap() = default;
+// MemoryMap::MemoryMap(MemoryMap&&) = default;
+// MemoryMap& MemoryMap::operator=(MemoryMap&&) = default;
+// MemoryMap::~MemoryMap() = default;
 
-MemoryMap::MemoryMap(const MemoryMap&) = delete;
-MemoryMap& MemoryMap::operator=(const MemoryMap&) = delete;
+// MemoryMap::MemoryMap(const MemoryMap&) = delete;
+// MemoryMap& MemoryMap::operator=(const MemoryMap&) = delete;
 
 
 MemoryMap::Path MemoryMap::getPathFromFullPathname(std::string_view pathname) const {

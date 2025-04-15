@@ -15,6 +15,7 @@
 #include "./memorymap.h"
 #include "./symbolmap.h"
 #include "./state.h"
+#include "./config.h"
 
 class Debugger {
 
@@ -23,13 +24,16 @@ class Debugger {
     //bool verbose;
     uint64_t loadAddress_;
     state::Child state_;
-    uint8_t context_;
+    Config globalConfig_;
+    Config::DebugConfig* config_;
+    //uint8_t context_;
     Breakpoint* retAddrFromMain_;
 
     dwarf::dwarf dwarf_;
     elf::elf elf_;
     MemoryMap memMap_;
     SymbolMap symMap_;
+
 
     std::unordered_map<std::intptr_t, Breakpoint> addrToBp_;
     std::unordered_map<const dwarf::compilation_unit*, std::vector<dwarf::section_offset>> functionDies_;

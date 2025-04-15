@@ -4,6 +4,7 @@
 #include "../include/register.h"
 #include "../include/breakpoint.h"
 #include "../include/memorymap.h"
+#include "../include/config.h"
 #include "../include/symbolmap.h"
 
 #include <dwarf/dwarf++.hh>
@@ -40,7 +41,7 @@ using util::promptYesOrNo;
 
 //Debugger Member Functions
 Debugger::Debugger(pid_t pid, std::string progName) : pid_(pid), progName_(std::move(progName)), 
-    loadAddress_(0), state_(Child::running), context_(2), retAddrFromMain_(nullptr) {
+    loadAddress_(0), state_(Child::running), globalConfig_(), config_(&globalConfig_.debugger_), retAddrFromMain_(nullptr) {
     auto fd = open(progName_.c_str(), O_RDONLY);
     
     elf_ = elf::elf(elf::create_mmap_loader(fd));
@@ -105,7 +106,7 @@ void Debugger::initializeMapsAndLoadAddress() {
         loadAddress_ = foundLoadAddress;
 
     }
-    symMap_ = SymbolMap(elf_, loadAddress_);
+    symMap_ = SymbolMap(elf_, loadAddress_, &globalConfig_.symbol_);
 
 }
 
@@ -121,9 +122,9 @@ void Debugger::handleChildState() {
                 continue;
             case Child::force_detach:
             case Child::detach:
-                std::cout << "[debug] End child process? "; // [y/n] ";
-                //std::getline(std::cin, response);
-                // if(response.length() > 0 && (response[0] == 'y' || response[0] == 'Y')) {
+                std::cout << "[debug] End child process? "; 
+
+                //Let user decide if child process should be killed
                 if(promptYesOrNo()) {
                     std::cerr << "[info] Ending child process. Thank you for using Peek!\n";
                     state_ = Child::kill;
@@ -147,7 +148,7 @@ void Debugger::handleChildState() {
         ptrace(PTRACE_DETACH, pid_, nullptr, SIGCONT);
         return;
     }
-    std::cerr << "[debug] Cleanup complete! continuing...\n\n";
+    //std::cerr << "[debug] Cleanup complete! continuing...\n";
     continueExecution();
 }
 
@@ -170,7 +171,6 @@ void Debugger::cleanup() {
     std::getline(std::cin, debugString);
     //detach from process
    // ptrace(PTRACE_TRACEME, 0, nullptr, nullptr);
-
 }
 
 void Debugger::continueExecution() {
@@ -186,8 +186,8 @@ uint64_t Debugger::getPCOffsetAddress() const {return offsetLoadAddress(getPC())
 pid_t Debugger::getPID() const {return pid_;}
 uint64_t Debugger::getPC() const { return getRegisterValue(pid_, Reg::rip); }
 bool Debugger::setPC(uint64_t val) { return setRegisterValue(pid_, Reg::rip, val); }
-uint8_t Debugger::getContext() const {return context_;}
-void Debugger::setContext(uint8_t context) {context_ = context;}
+uint8_t Debugger::getContext() const {return config_->context_;}
+void Debugger::setContext(uint8_t context) {config_->context_ = context;}
 
 
 
@@ -312,7 +312,7 @@ void Debugger::printSourceAtPC() {
     if(!validMemoryRegionShouldStep(itr, false)) return;
     
     auto lineEntryItr = itr.value();
-    printSource(lineEntryItr->file->path, lineEntryItr->line, context_);
+    printSource(lineEntryItr->file->path, lineEntryItr->line, config_->context_);
 }
 
 void Debugger::printMemoryLocationAtPC() const {
@@ -368,13 +368,12 @@ void Debugger::waitForSignal() {
     
     switch(signal.si_signo) {
         case SIGTRAP:
-        //std::cerr << "DEBUG : Handling SIGTRAP\n";
             handleSIGTRAP(signal);
 
             if(retAddrFromMain_ && isExecuting(state_) && 
                     getPC() == std::bit_cast<uint64_t>(retAddrFromMain_->getAddr())) {
                 std::cout << "[debug] In Debugger::waitForSignal() - Main return Breakpoint hit!\n";
-                    //"[debug] Preparing to cleanup and exit...\n";
+
                 if(state_ == Child::running) state_ = Child::finish;
                 else if(state_ == Child::faulting) state_ = Child::force_detach;
             }

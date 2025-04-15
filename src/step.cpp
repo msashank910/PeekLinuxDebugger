@@ -237,33 +237,32 @@ void Debugger::stepIn() {
     }
     //The line iterator does not exist, meaning we are in a region with no DWARF info
     //reaching this point means that we may need to do a state reversal
-    bool revertState = false;
-    bool revertRegs = false;
+    bool shouldRevertState = false;
+    bool didRevertRegs = false;
     auto chunk = memMap_.getChunkFromAddr(getPC());
     auto memoryLocation = (chunk ? MemoryMap::getNameFromPath(chunk.value().get().path) : "unmapped memory");
              
     if(!itr && isExecuting(state_)) {
         std::cout << "[info] Entered region with no DWARF info ("
             << memoryLocation << "). Revert state and step-over? ";
-        if(promptYesOrNo()) {
-            std::cout << "[warning] Region can only be stepped through by instruction.\n";
-        }
+
+        //Let user determine if state should be reversed
+        shouldRevertState = promptYesOrNo();
     }
 
-    if(revertState && readRegs && (revertRegs = setAllRegisterValues(pid_, regs))) {
+    if(shouldRevertState && readRegs && (didRevertRegs = setAllRegisterValues(pid_, regs))) {
         std::cout << "[debug] Reverting memory state and stepping over...\n";
         if(!readStack) {
-            for(size_t i = 0; i < stack.size(); i++) {
+            for(size_t i = 0; i < stack.size(); i++) {  //warnings could be simplified
                 if(!stack[i].second) {
                     std::cerr << "[warning] Address at 0x" << std::hex << std::uppercase
                         << (regs.rsp + 8 * (i+1)) << " was not read!\n";
                 }
             }
         }
-        
         bool wroteToStack = writeStackSnapshot(stack);
         if(!wroteToStack) {
-            for(size_t i = 0; i < stack.size(); i++) {
+            for(size_t i = 0; i < stack.size(); i++) {  //warnings could be simplified
                 if(!stack[i].second) {
                     std::cerr << "[warning] Address at 0x" << std::hex << std::uppercase
                         << (regs.rsp + 8 * (i+1)) << " was not written!\n";
@@ -271,18 +270,17 @@ void Debugger::stepIn() {
             }
         }
         stepOver();
-        //singleStep();  
-        //In future --> resolve end of main, check if stepin is in shared library or out of main
-        //If out of main, resort to single stepping, if in shared library:
-            //-> revert registers, then stepOver()  
     }
-    else if (revertState && readRegs && !revertRegs) {
+    else if (shouldRevertState && readRegs && !didRevertRegs) {
         std::cout << "[critical] Registers were not restored properly, proceed with caution. " 
             "Cannot step-over memory region with no DWARF info.\n";
     }
-    else if (revertState) {
+    else if (shouldRevertState) {
         std::cout << "[warning] Registers could not be restored! Cannot step-over memory region with no DWARF"
             " info.\n";
+    }
+    else if(!shouldRevertState) {   
+        std::cout << "[warning] Region can only be stepped through by instruction.\n";
     }
 }
 

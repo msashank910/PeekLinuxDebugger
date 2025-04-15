@@ -1,5 +1,6 @@
 #include "../include/symbolmap.h"
 #include "../include/util.h"
+#include "../include/config.h"
 
 #include <elf/elf++.hh> 
 
@@ -12,16 +13,43 @@
 
 using util::demangleSymbol;
 
-SymbolMap::SymbolMap() = default;
-SymbolMap::SymbolMap(const elf::elf& elf, uint64_t loadAddress) : elf_(elf), loadAddress_(loadAddress) {}
+// SymbolMap::SymbolMap() = default;
+SymbolMap::SymbolMap(const elf::elf& elf, uint64_t loadAddress, Config::SymbolConfig* config) : 
+    elf_(elf), loadAddress_(loadAddress), config_(config) { }
 
-SymbolMap::SymbolMap(SymbolMap&&) = default;
-SymbolMap& SymbolMap::operator=(SymbolMap&&) = default;
-SymbolMap::~SymbolMap() = default;
+// SymbolMap::SymbolMap(SymbolMap&&) = default;
+// SymbolMap& SymbolMap::operator=(SymbolMap&&) = default;
+// SymbolMap::~SymbolMap() = default;
 
-SymbolMap::SymbolMap(const SymbolMap&) = delete;
-SymbolMap& SymbolMap::operator=(const SymbolMap&) = delete;
+// SymbolMap::SymbolMap(const SymbolMap&) = delete;
+// SymbolMap& SymbolMap::operator=(const SymbolMap&) = delete;
 
+bool SymbolMap::initialized() {
+    return elf_.valid() && config_;
+}
+
+void SymbolMap::configure() {
+    auto deletion = config_->configureCache();
+    for(const auto& key : deletion) {
+        auto found = nonStrictSymbolCache_.find(key);
+        if(found == nonStrictSymbolCache_.end()) continue;
+        
+        nonStrictSymbolCache_.erase(found);
+    }
+}
+
+
+uint8_t SymbolMap::getMinCachedStringLength() { return config_->minCachedStringLength_; }
+void SymbolMap::setMinCachedStringLength(uint8_t length) {
+    config_->minCachedStringLength_ = length;
+    return configure();
+}
+
+size_t SymbolMap::getMaxSymbolCacheSize() { return config_->symbolCacheSize_; }
+void SymbolMap::setMaxSymbolCacheSize(size_t size) {
+    config_->symbolCacheSize_ = size;
+    return configure();
+}
 
 std::string SymbolMap::getNameFromSym(SymbolMap::Sym s) {
     switch(s) {
@@ -61,14 +89,21 @@ SymbolMap::Sym SymbolMap::getSymFromElf(elf::stt s) const {
 
 std::vector<SymbolMap::Symbol> SymbolMap::getSymbolListFromName(const std::string& name, bool strict) {
     auto it = nonStrictSymbolCache_.find(name);
-    if(it != nonStrictSymbolCache_.end() && !strict) return it->second;
-
     std::vector<Symbol> strictMatches;
+
     if(it != nonStrictSymbolCache_.end()) {
-        for(auto& symbol : it->second) {
-            if(name == symbol.name) strictMatches.push_back(symbol);
+        auto erase = config_->touchKey(name);
+        if(erase != "") {
+            std::cerr << "[warning] Cache is out of sync with LRU config. Clear cache to reset.";
         }
-        return strictMatches;
+
+        if(!strict) return it->second;
+        else {
+            for(auto& symbol : it->second) {
+                if(name == symbol.name) strictMatches.push_back(symbol);
+            }
+            return strictMatches;
+        }
     }
 
     std::vector<Symbol> nonStrictMatches;
@@ -100,14 +135,28 @@ std::vector<SymbolMap::Symbol> SymbolMap::getSymbolListFromName(const std::strin
         }
     }
     //Only cache non-strict symbols
-    nonStrictSymbolCache_[name] = std::move(nonStrictMatches);
-    if(strict) return strictMatches;
-    it = nonStrictSymbolCache_.find(name);
-    return it->second;
+    if(name.length() >= static_cast<size_t>(config_->minCachedStringLength_)) {
+        nonStrictSymbolCache_[name] = std::move(nonStrictMatches);
+        auto erase = config_->touchKey(name);
+        if(!erase.empty()) {
+            auto found = nonStrictSymbolCache_.find(erase);
+            if(found != nonStrictSymbolCache_.end()) {
+                nonStrictSymbolCache_.erase(found);
+            }
+        }
+        if(strict) return strictMatches;
+        return nonStrictSymbolCache_[name];
+        // it = nonStrictSymbolCache_.find(name);
+        // return it->second;
+    }
+    //If the name is too short to be cached
+    return (strict ? strictMatches : nonStrictMatches);
+    
 }
 
 void SymbolMap::dumpSymbolList(const std::vector<Symbol>& symbolList, const std::string& name, bool strict) {
     if(symbolList.empty()) {
+        //Could be formatted better
         std::cout << "[error] Symbol list for '" << name << "' is empty!\n";
         return;
     }
@@ -122,7 +171,7 @@ void SymbolMap::dumpSymbolList(const std::vector<Symbol>& symbolList, const std:
 
 void SymbolMap::dumpSymbolCache(bool strict) const {
     if(nonStrictSymbolCache_.empty()) {
-        std::cout << "[error] No symbol caches exist!";
+        std::cout << "\n[error] No symbol caches exist!";
         return;
     }
     std::cout << "\n--------------------------------------------------------\n";
@@ -137,7 +186,7 @@ void SymbolMap::dumpSymbolCache(bool strict) const {
 void SymbolMap::dumpSymbolCache(const std::string& name, bool strict) const {
     auto it = nonStrictSymbolCache_.find(name);
     if(it == nonStrictSymbolCache_.end()) {
-        std::cout << "[error] No symbol cache for '" << name << "'!";
+        std::cout << "\n[error] No symbol cache for '" << name << "'!";
         return;
     }
     std::cout << "\n--------------------------------------------------------\n"
@@ -146,5 +195,10 @@ void SymbolMap::dumpSymbolCache(const std::string& name, bool strict) const {
     std::cout << "--------------------------------------------------------\n";
 }
 
+
+void SymbolMap::clearCache() {
+    config_->clearCache();
+    nonStrictSymbolCache_.clear();
+}
 
 
