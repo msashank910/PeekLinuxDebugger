@@ -193,19 +193,11 @@ void Debugger::setContext(uint8_t context) {config_->context_ = context;}
 
 
 void Debugger::printBacktrace() {
-    //may need to subtract one from pc for symbol resolution
-    //this is since you can get it to point to the actual call site of the return addr
-    auto printFrame = [frame = 1, this](auto&& func, uint64_t pc) mutable {
-        auto chunk = memMap_.getChunkFromAddr(pc);
-        std::string memRegion = "unknown";
-        if(chunk) {
-            memRegion = chunk.value().get().pathname;
-        }
 
-        std::filesystem::path fs(memRegion);
-        auto filename = fs.pathname().string();
-        std::string funcName = "";   //check valid hex to string
+    auto printFrame = [frame = 1, this](auto& func, uint64_t pc) mutable {
 
+        // First, check if it is valid user-written function (default to address if not)
+        std::string funcName = ""; 
         if(func) {
             funcName = dwarf::at_name(func.value());
             auto symbols = symMap_.getSymbolListFromName(funcName, false);
@@ -218,20 +210,87 @@ void Debugger::printBacktrace() {
             }
         }
 
+        // Second, check if there is valid line entry (default to no line number if there isn't)
         auto lineEntry = getLineEntryFromPC(offsetLoadAddress(pc));
         std::string line = "";
         if(lineEntry) {
-            line += ":" + std::to_string(lineEntry.value()->line)
+            line += ":" + std::to_string(lineEntry.value()->line);
         }
 
-        std::cout << "(" << std::dec << frame << ") " << std::hex << std::uppercase;
-        if(funcName.empty()) {
-           std::cout << "0x" << offsetLoadAddress(pc);
+        /*
+            Third, check if there is a valid memory address space (chunk) at the address. 
+                -> If the chunk is invalid, default to unknown.
+            If the chunk is in the executable process with a valid line entry
+                -> use the corresponding .cpp or .h file from the line entry.
+            If the chunk exists but is not the executable's or doesn't have a line entry
+                -> use the binary's name
+        */
+        auto chunk = memMap_.getChunkFromAddr(pc);
+        std::string memRegion = "unknown";
+        if(chunk) {
+            if(chunk.value().get().isPathtypeExec() && lineEntry) {
+                memRegion = lineEntry.value()->file->path;
+            }
+            else {
+                memRegion = chunk.value().get().pathname;
+            }
         }
-        std::cout << filename << line;;
+
+        std::filesystem::path fs(memRegion);
+        auto filename = fs.filename().string();
+
+        /*
+            Fourth, assemble the individual strings into the final print log.
+            Print the following message:
+                1) Frame number (beginning with current frame)
+                2) Function name + "at" OR return address + "in"
+                3) Filename OR memory address space name (chunk name)
+                4) ":" + line number of the file (if the line entry exists)
+        */
+
+        std::cout << "(" << std::dec << frame++ << ") " << std::hex << std::uppercase;
+        if(funcName.empty()) {
+           std::cout << "0x" << pc << /*offsetLoadAddress(pc) <<*/ " in ";
+        }
+        else {
+            std::cout << funcName << " at " ;
+        }
+        std::cout << filename << line << "\n";
+    };
+    
+    auto isValidFramePointer = [this](uint64_t fp) -> bool {
+        if(fp == 0 || fp % 8 != 0) {
+            return false;
+        }
+        auto chunk = memMap_.getChunkFromAddr(fp);
+        return chunk && chunk.value().get().canRead();
     };
 
-    //Finish iteration
+    /* 
+        1) Print current frame.
+        2) Iterate while frame pointer to caller is valid:
+            3) Read memory address of return address to caller
+            4) Update frame pointer of caller to previous frame
+            5) Subtract one byte from return address to land at caller instruction
+            6) Retrieve function (if it exists) at return address
+            7) Print frame at return address
+    */
+
+    std::cout << "\n[info] Frames: "
+        "\n--------------------------------------------------------\n";
+    auto fp = getRegisterValue(pid_, Reg::rbp);
+    auto retAddr = getPC();
+    auto func = getFunctionFromPCOffset(offsetLoadAddress(retAddr));
+    printFrame(func, retAddr);
+    
+    while(isValidFramePointer(fp)) {
+        readMemory(fp + 8, retAddr);
+        readMemory(fp, fp);
+        func = getFunctionFromPCOffset(offsetLoadAddress(--retAddr)); 
+        printFrame(func, retAddr);
+    }
+    std::cout << "--------------------------------------------------------\n";
+
 }
 
 
