@@ -13,6 +13,7 @@
 #include <iostream>
 #include <unordered_map>
 #include <fstream>
+#include <filesystem>
 #include <sys/ptrace.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -190,6 +191,48 @@ uint8_t Debugger::getContext() const {return config_->context_;}
 void Debugger::setContext(uint8_t context) {config_->context_ = context;}
 
 
+
+void Debugger::printBacktrace() {
+    //may need to subtract one from pc for symbol resolution
+    //this is since you can get it to point to the actual call site of the return addr
+    auto printFrame = [frame = 1, this](auto&& func, uint64_t pc) mutable {
+        auto chunk = memMap_.getChunkFromAddr(pc);
+        std::string memRegion = "unknown";
+        if(chunk) {
+            memRegion = chunk.value().get().pathname;
+        }
+
+        std::filesystem::path fs(memRegion);
+        auto filename = fs.pathname().string();
+        std::string funcName = "";   //check valid hex to string
+
+        if(func) {
+            funcName = dwarf::at_name(func.value());
+            auto symbols = symMap_.getSymbolListFromName(funcName, false);
+            uint64_t low = dwarf::at_low_pc(func.value());
+            for(auto& s : symbols) {
+                if(s.addr == low) {
+                    funcName = s.name;
+                    break;
+                }
+            }
+        }
+
+        auto lineEntry = getLineEntryFromPC(offsetLoadAddress(pc));
+        std::string line = "";
+        if(lineEntry) {
+            line += ":" + std::to_string(lineEntry.value()->line)
+        }
+
+        std::cout << "(" << std::dec << frame << ") " << std::hex << std::uppercase;
+        if(funcName.empty()) {
+           std::cout << "0x" << offsetLoadAddress(pc);
+        }
+        std::cout << filename << line;;
+    };
+
+    //Finish iteration
+}
 
 
 
