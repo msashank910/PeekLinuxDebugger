@@ -580,6 +580,10 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
         }
         dumpFunctionDies();
     }
+    else if(isPrefix(argv[0], "backtrace")) {
+        std::cout << "[debug] Printing backtrace...\n";
+        printBacktrace();
+    }
     else if(argv[0] == "help") {
         std::cout << "[info] Welcome to Peek!";
     }

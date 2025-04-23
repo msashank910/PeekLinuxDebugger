@@ -66,6 +66,7 @@ class Debugger {
     void stepOverBreakpoint();
     void skipUnsafeInstruction(const size_t bytes = 8);
     void jumpToInstruction(const uint64_t newRip);
+    void printBacktrace();
 
     void waitForSignal();
     void handleSIGTRAP(siginfo_t signal);

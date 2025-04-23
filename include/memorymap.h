@@ -83,8 +83,8 @@ public:
     void dumpChunks() const;
 
     std::optional<std::reference_wrapper<const Chunk>> getChunkFromAddr(uint64_t addr) const;
-    bool canRead(uint64_t addr);
-    bool canWrite(uint64_t addr);
+    // bool canRead(uint64_t addr);
+    // bool canWrite(uint64_t addr);
 
     bool initialized() const;
 
