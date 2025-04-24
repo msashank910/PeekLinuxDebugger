@@ -161,11 +161,6 @@ void Debugger::cleanup() {
         //std::cerr << "DEBUG: disabling bp!\n";
         if(it.second.isEnabled()) it.second.disable();
     }
-    // dumpBreakpoints();
-    // dumpFunctionDies();
-    // dumpRegisters();
-    // memMap_.dumpChunks();
-    // symMap_.dumpSymbolCache();
 
     std::cout << "[info] Cleanup has been completed. Press [Enter] to exit the debugger. ";
     std::string debugString;

@@ -13,6 +13,8 @@ Peek is a lightweight Linux debugger for 64-bit systems, built from scratch in C
 - Source-Level stepping
 - Source-level breakpoints
 - Symbol resolution
+- Stack unwinding
+- Backtrace
 
 
 ## Technologies Used:
@@ -40,9 +42,9 @@ Peek is a lightweight Linux debugger for 64-bit systems, built from scratch in C
 
 #### Note: Debugee Program must be compiled with the following flags:
 
-    -g -gdwarf04
+    -g -gdwarf04 --fno-omit-frame-pointer -O0
 
-- You may also want to disable optimizations (-O0) for a smoother experience.
+- You may opt to exclude disable optimizations (-O0), but some functionality may have unexpected behavior
 
 While in the [__p|d__] command-line interface, you can interact with the child process via breakpoints, memory manipulation, and register manipulation.
 
@@ -62,10 +64,6 @@ While in the [__p|d__] command-line interface, you can interact with the child p
     Binaries must be compiled in C or C++ on x86-64 Linux
 
 ## 🛤 Roadmap
-
-#### Stack Unwinding
-
-- Implement stack trace generation to unwind the stack and show function call history.
 
 #### Handling Variables
 
