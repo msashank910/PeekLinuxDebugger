@@ -268,10 +268,11 @@ void Debugger::dumpBreakpoints() const {
     for(auto& it : addrToBp_) {
         auto addr = std::bit_cast<uint64_t>(it.first);
 
-        std::cout << "\n" << std::dec << count << ") 0x" << std::hex << std::uppercase << addr 
+        std::cout << "\n" << std::dec 
+            << (&it.second == retAddrFromMain_ ? "Main Return —" : std::to_string(count++) + ")") 
+            << " 0x" << std::hex << std::uppercase << addr 
             << " (0x" << offsetLoadAddress(addr) << ")"
             " [" << ((it.second.isEnabled()) ? "enabled" : "disabled") << "]";
-        ++count;
     }
     std::cout << std::endl;
 }

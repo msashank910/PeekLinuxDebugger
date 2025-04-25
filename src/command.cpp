@@ -120,8 +120,8 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
             }
             auto chunk = memMap_.getChunkFromAddr(std::bit_cast<uint64_t>(it->first));
             auto memSpace = chunk ? MemoryMap::getFileNameFromChunk(chunk.value()) : "Unmapped Memory";
-            std::cout << "[debug] Setting Breakpoint at: " << argv[1] << " (0x" << std::hex << it->first
-                    << ") --> " << memSpace  << "\n";
+            std::cout << "[debug] Setting Breakpoint at: " << argv[1] << " (0x" 
+            << std::hex << std::uppercase << it->first << ") --> " << memSpace  << "\n";
         }
         else if(argv[1][0] == '*' || ::isdigit(argv[1][0]))   {  //may change to stoull in future 
             uint64_t addr;
@@ -186,11 +186,12 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
                 if(it != addrToBp_.end()) {
                     if(!it->second.isEnabled()) it->second.enable();
 
-                    std::cout << "[debug] Breakpoint at 0x" << std::hex << it->first 
+                    std::cout << "[debug] Breakpoint at 0x" << std::hex << std::uppercase << it->first 
                         << " (0x" << offsetLoadAddress(addr) << ") is enabled!";
                 }
                 else {
-                    std::cout << "[error] No breakpoint found at address: 0x" << addr;
+                    std::cout << "[error] No breakpoint found at address: 0x" 
+                    << std::hex << std::uppercase << addr;
                     return true;
                 }
             }
@@ -220,7 +221,7 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
 
                     //Let user decide whether main bp should be disabled
                     if(promptYesOrNo()) {
-                        std::cerr << "[warning] Breakpoint at return address of main has been disable!\n";
+                        //std::cerr << "[warning] Breakpoint at return address of main has been disabled!\n";
                     }
                     else {
                         std::cout << "[debug] Aborting breakpoint disable.";
@@ -231,7 +232,7 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
                 if(it != addrToBp_.end()) {
                     if(it->second.isEnabled()) it->second.disable();
 
-                    std::cout << "[debug] Breakpoint at 0x" << std::hex << it->first 
+                    std::cout << "[debug] Breakpoint at 0x" << std::hex << std::uppercase << it->first 
                         << " (0x" << offsetLoadAddress(addr) << ") is disabled!";
                 }
                 else {

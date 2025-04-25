@@ -51,7 +51,7 @@ public:
     static std::string getNameFromSym(Sym s);
     Sym getSymFromElf(elf::stt s) const;
 
-    std::vector<Symbol> getSymbolListFromName(const std::string& name, bool strict = true);
+    std::vector<Symbol> getSymbolListFromName(const std::string& name, bool strict = true, bool cache = true);
     static void dumpSymbolList(const std::vector<Symbol>& symbolList, const std::string& name, 
         bool strict = false);
     void dumpSymbolCache(bool strict = false) const;

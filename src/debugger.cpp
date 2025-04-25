@@ -195,7 +195,7 @@ void Debugger::printBacktrace() {
         std::string funcName = ""; 
         if(func) {
             funcName = dwarf::at_name(func.value());
-            auto symbols = symMap_.getSymbolListFromName(funcName, false);
+            auto symbols = symMap_.getSymbolListFromName(funcName, false, false);
             uint64_t low = dwarf::at_low_pc(func.value());
             for(auto& s : symbols) {
                 if(s.addr == low) {

@@ -87,7 +87,7 @@ SymbolMap::Sym SymbolMap::getSymFromElf(elf::stt s) const {
     return Sym::NULL_SYM;
 }
 
-std::vector<SymbolMap::Symbol> SymbolMap::getSymbolListFromName(const std::string& name, bool strict) {
+std::vector<SymbolMap::Symbol> SymbolMap::getSymbolListFromName(const std::string& name, bool strict, bool cache) {
     auto it = nonStrictSymbolCache_.find(name);
     std::vector<Symbol> strictMatches;
 
@@ -135,7 +135,7 @@ std::vector<SymbolMap::Symbol> SymbolMap::getSymbolListFromName(const std::strin
         }
     }
     //Only cache non-strict symbols
-    if(name.length() >= static_cast<size_t>(config_->minCachedStringLength_)) {
+    if(cache && name.length() >= static_cast<size_t>(config_->minCachedStringLength_)) {
         nonStrictSymbolCache_[name] = std::move(nonStrictMatches);
         auto erase = config_->touchKey(name);
         if(!erase.empty()) {

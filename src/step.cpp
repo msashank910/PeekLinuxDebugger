@@ -70,8 +70,9 @@ void Debugger::stepOverBreakpoint() {
 
 
 bool Debugger::validMemoryRegionShouldStep(std::optional<dwarf::line_table::iterator> itr, bool shouldStep) {
+    if(isTerminated(state_)) return false;
     auto chunk = memMap_.getChunkFromAddr(getPC());
-
+    
     if (chunk && (!chunk->get().isPathtypeExec() || !itr)) {
         if(shouldStep) {
             auto c = chunk->get();
