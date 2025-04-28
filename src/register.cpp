@@ -149,7 +149,7 @@ void Debugger::readMemory(const uint64_t addr, uint64_t &data) const {  //PEEKDA
     errno = 0;
     long res = ptrace(PTRACE_PEEKDATA, pid_, addr, nullptr);
     
-    if(res == -1) {
+    if(res == -1 && errno) {
         throw std::runtime_error("\n[fatal] In Debugger::readMemory() - ptrace error: " 
 			+ std::string(strerror(errno)) + ".\n[fatal] Check Memory Address!\n");
     }

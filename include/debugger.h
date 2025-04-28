@@ -99,6 +99,11 @@ class Debugger {
     std::optional<dwarf::die> getFunctionFromPCOffset(uint64_t pc) const;
     std::optional<dwarf::line_table::iterator> getLineEntryFromPC(uint64_t pc) const;
 
+    void readVariable(const std::string& var) const;
+    void writeVariable(const std::string& var, const std::string& val);
+    void getVariables(const uint64_t pc) const;
+    void dumpVariables() const;
+
     void printSource(const std::string fileName, const unsigned line, const uint8_t numOfContextLines) const;
     void printSourceAtPC(); //can terminate debugger
     void printMemoryLocationAtPC() const;
