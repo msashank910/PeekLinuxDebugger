@@ -93,6 +93,12 @@ namespace reg {
 		})->regName;
 	}
 
+	std::string getRegisterName(const int dwarf) {
+		return std::find_if(regDescriptorList.begin(), regDescriptorList.end(), [dwarf](auto&& rd){
+			return rd.dwarfNum == dwarf;
+		})->regName;
+	}
+
     Reg getRegFromName(const std::string_view regName) {
 		auto it = std::find_if(regDescriptorList.begin(), regDescriptorList.end(), [regName](auto&& rd){
 			return rd.regName == regName;

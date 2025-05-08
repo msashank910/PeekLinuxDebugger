@@ -10,6 +10,7 @@
 #include <cstring>
 #include <cerrno>
 #include <stdexcept>
+#include <iostream>
 
 using namespace reg;
 
@@ -19,6 +20,7 @@ ptrace_expr_context::ptrace_expr_context(pid_t pid) : pid_(pid) {}
 
 
 dwarf::taddr ptrace_expr_context::reg(unsigned regnum) {
+    // std::cout << "regnum: " << std::dec << regnum << std::endl;
     return getRegisterValue(pid_, regnum);
 }
 
@@ -72,6 +74,58 @@ void Debugger::getVariables(const uint64_t pc) const {
 }
 
 void Debugger::dumpVariables() const {
+    auto func = getFunctionFromPCOffset(getPCOffsetAddress());
+    if(!func) {
+        std::cerr << "[error] Cannot dump variables in non-user written function.\n";
+        return;
+    }
 
+    auto functionDie = func.value();
+    size_t varCount = 0;
+
+    std::cout << "\n--------------------------------------------------------\n";
+
+    for(const auto& die : functionDie) {
+        if(die.tag != dwarf::DW_TAG::variable || !die.has(dwarf::DW_AT::location)) continue;
+        varCount++;
+        
+        auto loc = die[dwarf::DW_AT::location];
+        auto name = (die.has(dwarf::DW_AT::name) ? dwarf::at_name(die) : "variable");
+
+        if(loc.get_type() != dwarf::value::type::exprloc) {
+            //debug message
+            std::cout << "(" << std::dec << varCount << ") " << name
+                << " is not an exprloc\n";
+            continue;
+        }
+
+        ptrace_expr_context expr(pid_);
+        std::cerr << "prior to evaluation" << std::endl;
+        auto evaluation = loc.as_exprloc().evaluate(&expr);
+        std::cerr << "after evaluation" << std::endl;
+        uint64_t val;
+        std::cout << "(" << std::dec << varCount << ") " << name;
+
+        switch(evaluation.location_type) {
+            
+            case dwarf::expr_result::type::address:
+                readMemory(evaluation.value, val);
+                std::cout << " in memory at 0x" << std::hex << std::uppercase
+                    << evaluation.value << ": " << std::dec << val << "\n";
+                break;
+
+            case dwarf::expr_result::type::reg:
+                val = getRegisterValue(pid_, evaluation.value);
+                std::cout << " in register " << getRegisterName(evaluation.value) << ": "
+                    << std::dec << val << "\n";
+                break;
+
+            default:
+                std::cout << " is not stored in a memory address or register\n";
+                break;
+        }
+
+    }
+    std::cout << "\n--------------------------------------------------------\n";
 }
 

@@ -56,6 +56,7 @@ namespace reg {		//register is a reserved keyword
     uint64_t getRegisterValue(const pid_t pid, const int dwarfNum);
 
     std::string getRegisterName(const Reg r);
+    std::string getRegisterName(const int dwarfNum);
     Reg getRegFromName(const std::string_view regName);
 	bool getAllRegisterValues(const pid_t pid, user_regs_struct& rawRegVals);
 	bool setAllRegisterValues(const pid_t pid, user_regs_struct& rawRegVals);

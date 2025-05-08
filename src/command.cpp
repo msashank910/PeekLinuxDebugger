@@ -60,16 +60,8 @@ bool Debugger::handleCommand(const std::string& args, std::string& prevArgs) {
         //return false;
     }
     else if(argv[0] == "debug") {   //Change size of symbolCache
-        uint64_t num;
-        if(argv.size() > 1 && argv[1].length() > 0 && validDecStol(num, argv[1])) {
-            std::cout << "prev cache size: " << std::dec << symMap_.getMaxSymbolCacheSize() << "\n";
-            std::string random;
-            handleCommand("ds", random);
-            symMap_.setMaxSymbolCacheSize(static_cast<size_t>(num));
-            std::cout << "curr cache size: " << std::dec << symMap_.getMaxSymbolCacheSize() << "\n";
-            handleCommand("ds", random);
-        }
-        else std::cout << "[error] Cache size is invalid!";
+        std::cout << "[debug] Dumping variables...";
+        dumpVariables();
     }
     else if(argv[0] == "debug2") {   //debug command args currently - "debug" <name> ["strict"]
         uint64_t num;
