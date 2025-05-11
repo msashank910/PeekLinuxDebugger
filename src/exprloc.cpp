@@ -8,6 +8,7 @@
 #include <bit>
 #include <string>
 #include <cstring>
+#include <cstdint>
 #include <cerrno>
 #include <stdexcept>
 #include <iostream>
@@ -15,18 +16,21 @@
 using namespace reg;
 
 
-ptrace_expr_context::ptrace_expr_context(pid_t pid) : pid_(pid) {}
+ptrace_expr_context::ptrace_expr_context(pid_t pid, uint64_t loadAddress) : pid_(pid), loadAddress_(loadAddress) {}
 
 
 
 dwarf::taddr ptrace_expr_context::reg(unsigned regnum) {
-    // std::cout << "regnum: " << std::dec << regnum << std::endl;
+    // std::cout << "regnum, reg: " << std::dec << regnum << ", " << getRegisterName(regnum) << std::endl;
+    // auto val = getRegisterValue(pid_, regnum);
+    // std::cout << "val: " << std::hex << val << std::endl;
+    // return val;
     return getRegisterValue(pid_, regnum);
 }
 
 dwarf::taddr ptrace_expr_context::deref_size(dwarf::taddr address, unsigned size) {
     errno = 0;
-    long res = ptrace(PTRACE_PEEKDATA, pid_, address, nullptr);
+    long res = ptrace(PTRACE_PEEKDATA, pid_, loadAddress_ + address, nullptr);
     
     if(res == -1 && errno) {
         throw std::runtime_error("\n[fatal] In ptrace_expr_context::deref_size - ptrace error: " 
@@ -53,7 +57,7 @@ dwarf::taddr ptrace_expr_context::deref_size(dwarf::taddr address, unsigned size
 }
 
 dwarf::taddr ptrace_expr_context::pc() {
-    return getRegisterValue(pid_, Reg::rip);
+    return getRegisterValue(pid_, Reg::rip) - loadAddress_;
 }
 
 
@@ -81,7 +85,15 @@ void Debugger::dumpVariables() const {
     }
 
     auto functionDie = func.value();
+ 
+    if (!functionDie.has(dwarf::DW_AT::frame_base)) {
+        std::cerr << "[warning] Function has no frame base, cannot evaluate variables\n";
+        return;
+    }
+
     size_t varCount = 0;
+    // auto base = functionDie[dwarf::DW_AT::frame_base];
+    // std::cerr << "DW_AT::frame_base type = " << static_cast<int>(base.get_type()) << std::endl;
 
     std::cout << "\n--------------------------------------------------------\n";
 
@@ -99,11 +111,20 @@ void Debugger::dumpVariables() const {
             continue;
         }
 
-        ptrace_expr_context expr(pid_);
+        
+
+        ptrace_expr_context expr(pid_, loadAddress_);
         std::cerr << "prior to evaluation" << std::endl;
+        // if (die.has(dwarf::DW_AT::frame_base)) {
+        //     auto base = die[dwarf::DW_AT::frame_base];
+        //     std::cerr << "DW_AT::frame_base type = " << static_cast<int>(base.get_type()) << std::endl;
+        // } else {
+        //     std::cerr << "DIE has no frame_base\n";
+        // }
+        
         auto evaluation = loc.as_exprloc().evaluate(&expr);
         std::cerr << "after evaluation" << std::endl;
-        uint64_t val;
+        uint64_t val = 0;
         std::cout << "(" << std::dec << varCount << ") " << name;
 
         switch(evaluation.location_type) {
