@@ -50,6 +50,8 @@ dwarf::taddr ptrace_expr_context::deref_size(dwarf::taddr address, unsigned size
         
     */
     auto data = std::bit_cast<dwarf::taddr>(res);
+    auto test = data & ((uint64_t(1) << (size*8) ) - 1);
+    std::cout << "Size: " << std::dec << size << ", data: "  << data << "\nmask --> " << test << std::endl;
     if(size >= 8) return data;
     
     return data & ((uint64_t(1) << (size*8) ) - 1);    
@@ -111,19 +113,16 @@ void Debugger::dumpVariables() const {
             continue;
         }
 
-        
+        std::cout << std::endl;
+        for(auto[att, val] : die.attributes()) {
+            std::cout << "Att: " << dwarf::to_string(att) << ", val: " << dwarf::to_string(val) << "\n";
+        }
+        std::cout << std::endl;
 
         ptrace_expr_context expr(pid_, loadAddress_);
-        std::cerr << "prior to evaluation" << std::endl;
-        // if (die.has(dwarf::DW_AT::frame_base)) {
-        //     auto base = die[dwarf::DW_AT::frame_base];
-        //     std::cerr << "DW_AT::frame_base type = " << static_cast<int>(base.get_type()) << std::endl;
-        // } else {
-        //     std::cerr << "DIE has no frame_base\n";
-        // }
-        
         auto evaluation = loc.as_exprloc().evaluate(&expr);
-        std::cerr << "after evaluation" << std::endl;
+        std::cerr << "[debug] after evaluation" << std::endl;
+
         uint64_t val = 0;
         std::cout << "(" << std::dec << varCount << ") " << name;
 
