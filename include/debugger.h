@@ -1,6 +1,9 @@
 #pragma once
 
 #include <string>
+#include <variant>
+#include <cstddef>
+#include <cstdint>
 #include <unordered_map>
 #include <vector>
 #include <utility>
@@ -99,14 +102,40 @@ class Debugger {
     std::optional<dwarf::die> getFunctionFromPCOffset(uint64_t pc) const;
     std::optional<dwarf::line_table::iterator> getLineEntryFromPC(uint64_t pc) const;
 
+    void printSource(const std::string fileName, const unsigned line, const uint8_t numOfContextLines) const;
+    void printSourceAtPC(); //can terminate debugger
+    void printMemoryLocationAtPC() const;
+
+    //Variables
+    // using sInt = std::variant<int8_t, int16_t, int32_t, int64_t>;
+    // using uInt = std::variant<uint8_t, uint16_t, uint32_t, uint64_t>;
+    // using floating = std::variant<float, double>;
+    // using ptr = std::variant<uintptr_t, nullptr_t>;
+    // using type = std::variant<sInt, uInt, floating, ptr, std::string>;
+
+    enum class VarType {
+        sInt, uInt, floating, ptr, structType, tupleType, containerType
+    };
+
+    struct typeInfo {
+        std::string name;
+        VarType type;
+        size_t bytes;
+        std::vector<const typeInfo*> children;  //may need something for pointers to dereference to
+
+        bool isAggregate() const;
+        bool isPrimative() const;
+    };
+
+    std::unordered_map<std::string, typeInfo> varCache;  //maybe cache typeInfo unique pointers
+    typeInfo typeResolver(const dwarf::die& var);
+
     void readVariable(const std::string& var) const;
     void writeVariable(const std::string& var, const std::string& val);
     void getVariables(const uint64_t pc) const;
     void dumpVariables() const;
 
-    void printSource(const std::string fileName, const unsigned line, const uint8_t numOfContextLines) const;
-    void printSourceAtPC(); //can terminate debugger
-    void printMemoryLocationAtPC() const;
+
 
 
 public:

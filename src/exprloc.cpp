@@ -7,6 +7,9 @@
 #include <sys/ptrace.h>
 #include <bit>
 #include <string>
+#include <string_view>
+#include <vector>
+#include <utility>
 #include <cstring>
 #include <cstdint>
 #include <cerrno>
@@ -115,7 +118,7 @@ void Debugger::dumpVariables() const {
 
         std::cout << std::endl;
         for(auto[att, val] : die.attributes()) {
-            std::cout << "Att: " << dwarf::to_string(att) << ", val: " << dwarf::to_string(val) << "\n";
+            std::cout << "Att: " << dwarf::to_string(att) << " | val: " << dwarf::to_string(val) << "\n";
         }
         std::cout << std::endl;
 
@@ -149,3 +152,14 @@ void Debugger::dumpVariables() const {
     std::cout << "\n--------------------------------------------------------\n";
 }
 
+//TODO:
+// figure out type resolver functionality, and return type (may need optional)
+// figure out where to interpret bytes as type (may need a seperate function)
+Debugger::typeInfo Debugger::typeResolver(const dwarf::die& var) {
+    if(!var.has(dwarf::DW_AT::type)) return;
+
+    std::string name = (var.has(dwarf::DW_AT::name) ? dwarf::at_name(var) : "unnamed");
+    auto die = var;
+    auto typeDie = die[dwarf::DW_AT::type];
+
+}
